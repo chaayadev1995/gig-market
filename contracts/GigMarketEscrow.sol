@@ -8,6 +8,16 @@ interface IERC20 {
     function approve(address spender, uint256 value) external returns (bool);
 }
 
+interface IStableFXRouter {
+    function swap(
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 minAmountOut,
+        address recipient
+    ) external returns (uint256 amountOut);
+}
+
 contract GigMarketEscrow {
     enum JobStatus { Created, Active, Disputed, Resolved, Completed }
     enum VoteOption { None, ClientWins, FreelancerWins, Split }
@@ -34,6 +44,8 @@ contract GigMarketEscrow {
     }
 
     IERC20 public immutable usdcToken;
+    IERC20 public eurcToken;
+    address public stableFXRouter;
     address public owner;
     uint256 public jobCount;
     uint256 public platformFeesAccumulated;
@@ -46,6 +58,9 @@ contract GigMarketEscrow {
     
     // Milestones: jobId => milestoneIndex => Milestone
     mapping(uint256 => mapping(uint256 => Milestone)) public jobMilestones;
+
+    // jobId => preferred payout currency ("USDC" or "EURC")
+    mapping(uint256 => string) public jobPayoutCurrency;
 
     // Jurors
     mapping(address => bool) public isJuror;
@@ -66,6 +81,7 @@ contract GigMarketEscrow {
     event DisputeVoted(uint256 indexed jobId, address indexed juror, VoteOption vote);
     event DisputeResolved(uint256 indexed jobId, VoteOption winningOption);
     event JurorRegistered(address indexed juror);
+    event PayoutCurrencyUpdated(uint256 indexed jobId, string currency);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Not owner");
@@ -91,6 +107,22 @@ contract GigMarketEscrow {
         usdcToken = IERC20(_usdcToken);
         owner = msg.sender;
     }
+
+    function setStableFX(address _router, address _eurcToken) external onlyOwner {
+        stableFXRouter = _router;
+        eurcToken = IERC20(_eurcToken);
+    }
+
+    function setPayoutCurrency(uint256 jobId, string calldata currency) external onlyJobFreelancer(jobId) {
+        require(
+            keccak256(abi.encodePacked(currency)) == keccak256(abi.encodePacked("USDC")) ||
+            keccak256(abi.encodePacked(currency)) == keccak256(abi.encodePacked("EURC")),
+            "Invalid currency"
+        );
+        jobPayoutCurrency[jobId] = currency;
+        emit PayoutCurrencyUpdated(jobId, currency);
+    }
+
 
     // --- REPUTATION AND STAKE LOGIC (Feature D) ---
     
@@ -190,6 +222,10 @@ contract GigMarketEscrow {
 
     // Either the Client directly approves, or the automated system (GitHub trigger) calls this
     function approveMilestone(uint256 jobId, uint256 milestoneIndex) external {
+        approveMilestoneWithSlippage(jobId, milestoneIndex, 0);
+    }
+
+    function approveMilestoneWithSlippage(uint256 jobId, uint256 milestoneIndex, uint256 minAmountEURC) public {
         Job storage job = jobs[jobId];
         require(job.status == JobStatus.Active, "Job not active");
         
@@ -232,10 +268,29 @@ contract GigMarketEscrow {
         }
 
         // Payout to Freelancer: Milestone earnings + Staked Collateral return
-        require(
-            usdcToken.transfer(job.freelancer, freelancerPayout + stakeReturn),
-            "Payout transfer failed"
-        );
+        uint256 totalPayoutUSDC = freelancerPayout + stakeReturn;
+
+        if (keccak256(abi.encodePacked(jobPayoutCurrency[jobId])) == keccak256(abi.encodePacked("EURC")) && stableFXRouter != address(0)) {
+            // Approve router to spend USDC
+            usdcToken.approve(stableFXRouter, totalPayoutUSDC);
+            
+            // Execute swap via stableFXRouter
+            uint256 amountOut = IStableFXRouter(stableFXRouter).swap(
+                address(usdcToken),
+                address(eurcToken),
+                totalPayoutUSDC,
+                minAmountEURC,
+                job.freelancer
+            );
+            
+            require(amountOut >= minAmountEURC, "Slippage limit exceeded");
+        } else {
+            // Transfer USDC directly
+            require(
+                usdcToken.transfer(job.freelancer, totalPayoutUSDC),
+                "Payout transfer failed"
+            );
+        }
 
         emit MilestoneCompleted(jobId, milestoneIndex, payout);
     }
