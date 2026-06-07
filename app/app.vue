@@ -216,6 +216,34 @@
           </div>
         </div>
 
+        <!-- Gasless Sponsored Metrics Dashboard -->
+        <div class="glass-panel" style="margin-bottom: 24px; border-color: var(--accent-teal); box-shadow: 4px 4px 0px var(--accent-teal); background: var(--bg-secondary); display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; padding: 20px;">
+          <div>
+            <div style="font-size: 11px; font-family: var(--font-display); font-weight: 700; text-transform: uppercase; color: var(--accent-teal-dark); margin-bottom: 4px;">⚡ Gasless Transactions</div>
+            <div style="font-size: 28px; font-family: var(--font-display); font-weight: 800; color: var(--text-primary);">{{ sponsoredTxCount }}</div>
+            <div style="font-size: 12px; color: var(--text-secondary);">Sponsored by Paymaster</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-family: var(--font-display); font-weight: 700; text-transform: uppercase; color: var(--accent-green); margin-bottom: 4px;">💸 Gas Fees Saved</div>
+            <div style="font-size: 28px; font-family: var(--font-display); font-weight: 800; color: var(--accent-green);">{{ sponsoredGasSaved.toFixed(4) }} USDC</div>
+            <div style="font-size: 12px; color: var(--text-secondary);">Aggregate savings on Arc</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-family: var(--font-display); font-weight: 700; text-transform: uppercase; color: var(--accent-purple); margin-bottom: 4px;">🛡️ Paymaster Account</div>
+            <div style="font-size: 13px; font-family: monospace; font-weight: 700; color: var(--text-primary); margin-top: 6px; word-break: break-all;">
+              {{ systemStatus.circleStatus?.paymasterAddress || '0x0000000071727E5C77c03C68673752c289654e53' }}
+            </div>
+            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">ERC-4337 Smart Paymaster</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-family: var(--font-display); font-weight: 700; text-transform: uppercase; color: var(--accent-orange); margin-bottom: 4px;">📜 Gas Station Policy</div>
+            <div style="font-size: 13px; font-family: monospace; font-weight: 700; color: var(--text-primary); margin-top: 6px; word-break: break-all;">
+              {{ systemStatus.circleStatus?.paymasterPolicyId?.slice(0, 16) + '...' }}
+            </div>
+            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Active Sponsorship Policy</div>
+          </div>
+        </div>
+
         <!-- Sub Tab Navigation links inside the Portal view -->
         <div class="nav-links" style="display: inline-flex; gap: 8px; margin-bottom: 24px; padding: 4px; border: var(--border-width) solid var(--border-color); border-radius: var(--border-radius-sm);">
           <span class="nav-link" :class="{ active: currentTab === 'client' }" @click="currentTab = 'client'">Client Portal</span>
@@ -922,6 +950,16 @@
             <div class="wallet-modal-sidebar">
               <button 
                 class="wallet-option-btn" 
+                :class="{ active: selectedWallet === 'circle' }"
+                @click="selectWallet('circle')"
+              >
+                <div class="wallet-logo-container" style="background: var(--accent-teal); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; width: 20px; height: 20px;">
+                  🔑
+                </div>
+                Email / Social
+              </button>
+              <button 
+                class="wallet-option-btn" 
                 :class="{ active: selectedWallet === 'metamask' }"
                 @click="selectWallet('metamask')"
               >
@@ -997,6 +1035,67 @@
                 <h4 class="wallet-status-title">Connection Rejected</h4>
                 <p class="wallet-status-desc">{{ walletConnectionError }}</p>
                 <button class="btn btn-secondary btn-small" @click="retryWalletConnection">Try Again</button>
+              </div>
+
+              <!-- Circle view -->
+              <div v-else-if="selectedWallet === 'circle'" style="width: 100%;">
+                <!-- PIN Setup Screen -->
+                <div v-if="showPinScreen" style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+                  <div style="background: var(--accent-teal-light); border: 2.5px solid var(--border-color); border-radius: 50%; padding: 16px; margin-bottom: 16px; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 2px 2px 0px var(--border-color);">
+                    🔒
+                  </div>
+                  <h4 class="wallet-status-title">Configure Wallet PIN</h4>
+                  <p class="wallet-status-desc">Create your 6-digit secure PIN. This PIN will be required to authorize transfers and smart contract actions.</p>
+                  
+                  <div style="margin: 20px 0; width: 100%; text-align: center;">
+                    <span style="font-size: 12px; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 12px;">A Circle secure dialog will launch next to prompt for PIN selection.</span>
+                    <button class="btn btn-accent" style="width: 100%;" @click="submitPinSetup" :disabled="isInitializingWallet">
+                      {{ isInitializingWallet ? 'Initializing...' : 'Launch Secure PIN Setup' }}
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Email / Login Screen -->
+                <div v-else style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+                  <div style="background: var(--accent-teal-light); border: 2.5px solid var(--border-color); border-radius: 50%; padding: 16px; margin-bottom: 16px; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 2px 2px 0px var(--border-color);">
+                    📧
+                  </div>
+                  <h4 class="wallet-status-title">Circle Web2 Portal</h4>
+                  <p class="wallet-status-desc">Sign in securely using your email or social credentials. No browser extension required.</p>
+                  
+                  <!-- Email input -->
+                  <div style="width: 100%; display: flex; flex-direction: column; gap: 12px; margin: 20px 0;">
+                    <input 
+                      type="email" 
+                      v-model="circleEmail" 
+                      placeholder="Enter email address" 
+                      class="form-input" 
+                      style="width: 100%; font-size: 14px; padding: 12px; border-radius: var(--border-radius-sm); border: var(--border-width) solid var(--border-color); text-align: center;"
+                      :disabled="isConnectingWallet"
+                      @keydown.enter="handleCircleLogin"
+                    />
+                    <button class="btn btn-primary" style="width: 100%;" @click="handleCircleLogin" :disabled="isConnectingWallet">
+                      {{ isConnectingWallet ? 'Authenticating...' : 'Sign In with Email' }}
+                    </button>
+                  </div>
+
+                  <!-- Divider -->
+                  <div style="display: flex; align-items: center; width: 100%; margin: 10px 0;">
+                    <div style="flex: 1; height: 2px; background: var(--border-color);"></div>
+                    <span style="margin: 0 14px; font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.05em;">or connect with</span>
+                    <div style="flex: 1; height: 2px; background: var(--border-color);"></div>
+                  </div>
+
+                  <!-- Social Logins -->
+                  <div style="display: flex; gap: 12px; width: 100%; margin-top: 12px;">
+                    <button class="btn btn-secondary" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 0; font-size: 13px;" @click="circleEmail = 'google-user@gmail.com'; handleCircleLogin()">
+                      <span>🌐</span> Google
+                    </button>
+                    <button class="btn btn-secondary" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 0; font-size: 13px;" @click="circleEmail = 'apple-user@icloud.com'; handleCircleLogin()">
+                      <span>🍎</span> Apple
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <!-- MetaMask view -->
@@ -1099,7 +1198,7 @@
                 </button>
               </div>
               
-              <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Connected via Browser Extension</p>
+              <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Connected via {{ circleUserWallet ? 'Circle Web2 Wallet' : 'Browser Extension' }}</p>
             </div>
 
             <!-- Divider -->
@@ -1112,7 +1211,7 @@
               <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-weight: 700; color: var(--text-primary);">
                 <span style="display: flex; align-items: center; gap: 6px;">
                   <span style="width: 8px; height: 8px; background: var(--accent-teal); border-radius: 50%;"></span>
-                  USDC (Gas Token)
+                  USDC Balance
                 </span>
                 <span>{{ userUsdcBalance }} USDC</span>
               </div>
@@ -1123,6 +1222,10 @@
                   EURC (Stablecoin)
                 </span>
                 <span>{{ userEurcBalance }} EURC</span>
+              </div>
+              
+              <div v-if="circleUserWallet" style="margin-top: 12px; font-size: 12px; color: var(--accent-teal-dark); font-weight: 700; text-align: center; background: var(--accent-teal-light); padding: 6px; border: 1.5px solid var(--border-color); border-radius: var(--border-radius-sm);">
+                ⚡ Gas fees are 100% sponsored by platform paymaster!
               </div>
             </div>
 
@@ -1247,6 +1350,31 @@ import {
   EURC_TOKEN_ADDRESS 
 } from './utils/contract';
 import { activeModal, closeModal, modals, handleError } from './utils/modals';
+import {
+  circleUserWallet,
+  circleSessionToken,
+  circleEncryptionKey,
+  circleAppId,
+  circleUserId,
+  isSimulationMode,
+  initCircleSdk,
+  executeChallenge,
+  checkPersistedWallet,
+  persistWalletState,
+  clearWalletState
+} from './utils/circle-wallet';
+import {
+  sponsoredTxCount,
+  sponsoredGasSaved,
+  executeSponsoredTransaction
+} from './utils/modular-wallet';
+
+const circleEmail = ref('');
+const showPinScreen = ref(false);
+const pinCode = ref('');
+const activeChallengeId = ref('');
+const tempSessionData = ref(null);
+const isInitializingWallet = ref(false);
 
 const currentTab = ref('client');
 const freelancerSubTab = ref('browse');
@@ -1340,9 +1468,10 @@ const copyStatusText = ref('Copy');
 
 function openWalletModal() {
   isWalletModalOpen.value = true;
-  selectedWallet.value = 'metamask';
+  selectedWallet.value = 'circle';
   walletConnectionError.value = '';
   isConnectingWallet.value = false;
+  showPinScreen.value = false;
 }
 
 function closeWalletModal() {
@@ -1353,6 +1482,104 @@ function selectWallet(walletKey) {
   selectedWallet.value = walletKey;
   walletConnectionError.value = '';
   isConnectingWallet.value = false;
+}
+
+async function handleCircleLogin() {
+  if (!circleEmail.value || !circleEmail.value.includes('@')) {
+    walletConnectionError.value = 'Please input a valid email address.';
+    return;
+  }
+  isConnectingWallet.value = true;
+  walletConnectionError.value = '';
+  try {
+    console.log('[CircleUCW] Authenticating user:', circleEmail.value);
+    const response = await $fetch('/api/circle-wallet-session', {
+      method: 'POST',
+      body: { userId: circleEmail.value }
+    });
+
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to authenticate user');
+    }
+
+    tempSessionData.value = response;
+
+    if (response.status === 'INITIALIZING') {
+      activeChallengeId.value = response.challengeId;
+      showPinScreen.value = true;
+      await initCircleSdk(response.appId, response.userToken, response.encryptionKey);
+    } else if (response.status === 'ACTIVE') {
+      const wallet = response.wallets[0];
+      persistWalletState(
+        wallet, 
+        response.userToken, 
+        response.encryptionKey, 
+        response.appId, 
+        response.userId,
+        response.isSimulation
+      );
+      userAddress.value = wallet.address;
+      await fetchUserBlockchainDetails();
+      closeWalletModal();
+      modals.success('Welcome Back!', `Successfully authenticated. Wallet: ${shortAddress(wallet.address)}`);
+    }
+  } catch (e) {
+    console.error('Circle login failed:', e);
+    walletConnectionError.value = e.message || 'Circle authentication failed.';
+  } finally {
+    isConnectingWallet.value = false;
+  }
+}
+
+async function submitPinSetup() {
+  isInitializingWallet.value = true;
+  modals.loading('Creating Wallet', 'Initializing your secure user-controlled wallet on Arc Testnet. Please wait...');
+  try {
+    const result = await executeChallenge(activeChallengeId.value);
+    console.log('[CircleUCW] Challenge completion result:', result);
+
+    let wallet = null;
+    if (tempSessionData.value.isSimulation) {
+      wallet = {
+        id: 'mock-wallet-id',
+        address: tempSessionData.value.mockAddress,
+        blockchain: 'ETH-SEPOLIA'
+      };
+    } else {
+      // Re-fetch wallets via session API
+      const response = await $fetch('/api/circle-wallet-session', {
+        method: 'POST',
+        body: { userId: circleEmail.value }
+      });
+      if (response.success && response.wallets && response.wallets.length > 0) {
+        wallet = response.wallets[0];
+      } else {
+        throw new Error('Wallet not found after initialization challenge');
+      }
+    }
+
+    if (wallet) {
+      persistWalletState(
+        wallet,
+        tempSessionData.value.userToken,
+        tempSessionData.value.encryptionKey,
+        tempSessionData.value.appId,
+        tempSessionData.value.userId,
+        tempSessionData.value.isSimulation
+      );
+      userAddress.value = wallet.address;
+      await fetchUserBlockchainDetails();
+      closeWalletModal();
+      modals.success('Wallet Created!', `Your secure user-controlled wallet was successfully generated on Arc Testnet.\nAddress: ${wallet.address}`);
+    }
+  } catch (e) {
+    console.error('PIN setup challenge failed:', e);
+    modals.error('Initialization Failed', e.message || 'Failed to complete wallet setup.');
+  } finally {
+    isInitializingWallet.value = false;
+    showPinScreen.value = false;
+    tempSessionData.value = null;
+  }
 }
 
 function openConnectedModal() {
@@ -1368,6 +1595,7 @@ function disconnectWallet() {
   userAddress.value = '';
   userUsdcBalance.value = '0.00';
   userEurcBalance.value = '0.00';
+  clearWalletState();
   closeConnectedModal();
 }
 
@@ -1431,9 +1659,14 @@ const disputedJobs = computed(() => jobsList.value.filter(j => j.status === 'Dis
 onMounted(async () => {
   await fetchSystemStatus();
   await loadJobsFromLocalDb();
-  
-  // Try connecting automatically if already connected
-  if (window.ethereum) {
+
+  // 1. Check for persisted Circle User Wallet first
+  checkPersistedWallet();
+  if (circleUserWallet.value) {
+    userAddress.value = circleUserWallet.value.address;
+    await fetchUserBlockchainDetails();
+  } else if (window.ethereum) {
+    // 2. Fall back to browser extension auto-connect
     try {
       const accounts = await window.ethereum.request({ method: 'eth_accounts' });
       if (accounts.length > 0) {
@@ -1673,6 +1906,104 @@ async function createGig() {
     modals.warning('Wallet Disconnected', 'Please connect your EVM wallet first to compile and fund new escrow jobs.');
     return;
   }
+
+  const contractAddress = systemStatus.value.contractAddress;
+  const usdcUnits = parseUnits(newJob.value.budget.toString(), 6);
+  const milestoneBudgets = newJob.value.milestones.map(m => parseUnits(m.budget.toString(), 6));
+  const milestoneTitles = newJob.value.milestones.map(m => m.title);
+
+  if (circleUserWallet.value) {
+    isSubmitting.value = true;
+    try {
+      // 1. Approve USDC transfer via Sponsored Transaction
+      modals.loading('Authorizing USDC Budget', 'Step 1 of 2: Authorizing USDC budget allocation. Processing (Gasless Sponsored Transaction)...');
+      const approveRes = await executeSponsoredTransaction({
+        walletId: circleUserWallet.value.id,
+        contractAddress: USDC_TOKEN_ADDRESS,
+        abiFunctionSignature: 'approve(address,uint256)',
+        abiParameters: [contractAddress, usdcUnits.toString()],
+        userToken: circleSessionToken.value,
+        userAddress: userAddress.value,
+        isSimulation: isSimulationMode.value,
+        executeChallengeFn: executeChallenge
+      });
+      const approveTxHash = approveRes.txHash || 'Pending';
+      
+      // 2. Create Job via Sponsored Transaction
+      closeModal();
+      modals.loading('Funding Escrow Job', 'Step 2 of 2: Securing project budget in escrow. Processing (Gasless Sponsored Transaction)...');
+      
+      const createRes = await executeSponsoredTransaction({
+        walletId: circleUserWallet.value.id,
+        contractAddress: contractAddress,
+        abiFunctionSignature: 'createJob(uint256,string,uint256[],string[])',
+        abiParameters: [
+          usdcUnits.toString(),
+          newJob.value.repoUrl,
+          milestoneBudgets.map(b => b.toString()),
+          milestoneTitles
+        ],
+        userToken: circleSessionToken.value,
+        userAddress: userAddress.value,
+        isSimulation: isSimulationMode.value,
+        executeChallengeFn: executeChallenge
+      });
+      const createTxHash = createRes.txHash || 'Pending';
+
+      let jobIdVal = 1;
+      if (!isSimulationMode.value) {
+        const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
+        const jobCount = await publicClient.readContract({
+          address: contractAddress,
+          abi: GIGMARKET_ESCROW_ABI,
+          functionName: 'jobCount'
+        });
+        jobIdVal = parseInt(jobCount.toString());
+      } else {
+        jobIdVal = jobsList.value.length + 1;
+      }
+      
+      // Post to db
+      const newJobDb = {
+        id: jobIdVal,
+        title: newJob.value.title,
+        description: newJob.value.description,
+        repoUrl: newJob.value.repoUrl,
+        budget: newJob.value.budget,
+        requiredStake: calculateJobRequiredStake(newJob.value.budget),
+        freelancerStake: '0',
+        client: userAddress.value,
+        freelancer: '0x0000000000000000000000000000000000000000',
+        status: 'Created',
+        currentMilestone: 0,
+        milestones: newJob.value.milestones.map(m => ({
+          title: m.title,
+          budget: m.budget,
+          completed: false,
+          approved: false,
+          txHash: createTxHash
+        }))
+      };
+
+      await $fetch('/api/jobs', { method: 'POST', body: newJobDb });
+      
+      closeModal();
+      modals.success('Escrow Job Published!', `Successfully initiated Project #${jobIdVal} and secured the ${newJob.value.budget} USDC budget!`);
+      await loadJobsFromLocalDb();
+      
+      newJob.value.title = '';
+      newJob.value.description = '';
+      newJob.value.repoUrl = '';
+    } catch (e) {
+      console.error('Circle job posting failed:', e);
+      closeModal();
+      modals.error('Job Posting Failed', e.message || 'Circle transaction failed.');
+    } finally {
+      isSubmitting.value = false;
+    }
+    return;
+  }
+
   isSubmitting.value = true;
   modals.loading('Authorizing USDC Budget', 'Step 1 of 2: Please sign the transaction inside your wallet provider to approve USDC stablecoin allocation...');
   try {
@@ -1682,9 +2013,6 @@ async function createGig() {
       chain: arcTestnet,
       transport: custom(window.ethereum)
     });
-
-    const contractAddress = systemStatus.value.contractAddress;
-    const usdcUnits = parseUnits(newJob.value.budget.toString(), 6);
 
     // 1. Approve USDC transfer
     const approveTx = await walletClient.writeContract({
@@ -1702,9 +2030,6 @@ async function createGig() {
     closeModal();
     modals.loading('Funding Escrow Job', 'Step 2 of 2: Authorizing the smart contract secure deposit pool. Confirm the signature request in your wallet...');
     
-    const milestoneBudgets = newJob.value.milestones.map(m => parseUnits(m.budget.toString(), 6));
-    const milestoneTitles = newJob.value.milestones.map(m => m.title);
-
     const createTx = await walletClient.writeContract({
       address: contractAddress,
       abi: GIGMARKET_ESCROW_ABI,
@@ -1742,7 +2067,7 @@ async function createGig() {
         budget: m.budget,
         completed: false,
         approved: false,
-        txHash: ''
+        txHash: createTx
       }))
     };
 
@@ -1773,11 +2098,72 @@ async function joinGig(job) {
     modals.warning('Wallet Disconnected', 'Please connect your EVM wallet first to join projects.');
     return;
   }
-  isSubmitting.value = true;
   
   const requiredStakeVal = calculateJobRequiredStake(job.budget);
   const stakeUnits = parseUnits(requiredStakeVal, 6);
+  const contractAddress = systemStatus.value.contractAddress;
 
+  if (circleUserWallet.value) {
+    isSubmitting.value = true;
+    try {
+      // 1. Approve USDC if stake > 0
+      if (stakeUnits > 0n) {
+        modals.loading('Preparing Collateral Stake', `Staking requirement: ${requiredStakeVal} USDC. Processing (Gasless Sponsored Transaction)...`);
+        await executeSponsoredTransaction({
+          walletId: circleUserWallet.value.id,
+          contractAddress: USDC_TOKEN_ADDRESS,
+          abiFunctionSignature: 'approve(address,uint256)',
+          abiParameters: [contractAddress, stakeUnits.toString()],
+          userToken: circleSessionToken.value,
+          userAddress: userAddress.value,
+          isSimulation: isSimulationMode.value,
+          executeChallengeFn: executeChallenge
+        });
+      }
+
+      // 2. Join Gig via Sponsored Transaction
+      closeModal();
+      modals.loading('Registering Contract', 'Submitting registration. Processing (Gasless Sponsored Transaction)...');
+      const joinRes = await executeSponsoredTransaction({
+        walletId: circleUserWallet.value.id,
+        contractAddress: contractAddress,
+        abiFunctionSignature: 'joinJob(uint256)',
+        abiParameters: [job.id.toString()],
+        userToken: circleSessionToken.value,
+        userAddress: userAddress.value,
+        isSimulation: isSimulationMode.value,
+        executeChallengeFn: executeChallenge
+      });
+      const joinResult = joinRes;
+
+      const updatedJob = {
+        ...job,
+        status: 'Active',
+        freelancer: userAddress.value,
+        requiredStake: requiredStakeVal,
+        freelancerStake: requiredStakeVal
+      };
+
+      await $fetch('/api/jobs', {
+        method: 'POST',
+        body: updatedJob
+      });
+
+      closeModal();
+      modals.success('Joined Project Successfully!', `You have joined Job #${job.id} as active freelancer! Staked collateral amount: ${requiredStakeVal} USDC.`);
+      await loadJobsFromLocalDb();
+      await fetchUserBlockchainDetails();
+    } catch (e) {
+      console.error('Circle joining gig failed:', e);
+      closeModal();
+      modals.error('Failed to Join Project', e.message || 'Circle transaction failed.');
+    } finally {
+      isSubmitting.value = false;
+    }
+    return;
+  }
+
+  isSubmitting.value = true;
   modals.loading('Preparing Collateral Stake', `Staking requirement: ${requiredStakeVal} USDC. Preparing allowance authorization transaction...`);
 
   try {
@@ -1787,8 +2173,6 @@ async function joinGig(job) {
       chain: arcTestnet,
       transport: custom(window.ethereum)
     });
-
-    const contractAddress = systemStatus.value.contractAddress;
 
     // 1. Approve USDC if stake > 0
     if (stakeUnits > 0n) {
@@ -1851,6 +2235,56 @@ async function payoutMilestone(jobId, milestoneIndex) {
     modals.warning('Wallet Disconnected', 'Please connect your EVM wallet first to release escrow payouts.');
     return;
   }
+
+  const contractAddress = systemStatus.value.contractAddress;
+
+  if (circleUserWallet.value) {
+    isSubmitting.value = true;
+    modals.loading('Releasing Milestone Funds', `Processing (Gasless Sponsored Transaction)...`);
+    try {
+      const payoutRes = await executeSponsoredTransaction({
+        walletId: circleUserWallet.value.id,
+        contractAddress: contractAddress,
+        abiFunctionSignature: 'approveMilestone(uint256,uint256)',
+        abiParameters: [jobId.toString(), milestoneIndex.toString()],
+        userToken: circleSessionToken.value,
+        userAddress: userAddress.value,
+        isSimulation: isSimulationMode.value,
+        executeChallengeFn: executeChallenge
+      });
+      const txHash = payoutRes.txHash || 'Pending';
+
+      // Fetch original job to update in db
+      const job = jobsList.value.find(j => j.id === jobId);
+      const updatedJob = { ...job };
+      updatedJob.milestones[milestoneIndex].completed = true;
+      updatedJob.milestones[milestoneIndex].approved = true;
+      updatedJob.milestones[milestoneIndex].txHash = txHash;
+      updatedJob.currentMilestone = parseInt(updatedJob.currentMilestone) + 1;
+      
+      if (updatedJob.currentMilestone >= updatedJob.milestones.length) {
+        updatedJob.status = 'Completed';
+      }
+
+      await $fetch('/api/jobs', {
+        method: 'POST',
+        body: updatedJob
+      });
+
+      closeModal();
+      modals.success('Milestone Payout Disbursed!', `Successfully transferred milestone funds to the freelancer's wallet and unlocked proportional staking collateral!`);
+      await loadJobsFromLocalDb();
+      await fetchUserBlockchainDetails();
+    } catch (e) {
+      console.error('Circle milestone payout failed:', e);
+      closeModal();
+      modals.error('Payout Failed', e.message || 'Circle transaction failed.');
+    } finally {
+      isSubmitting.value = false;
+    }
+    return;
+  }
+
   isSubmitting.value = true;
   modals.loading('Releasing Milestone Funds', `Confirming payout signature request for Milestone #${milestoneIndex + 1} of Job #${jobId}...`);
   try {
@@ -1860,8 +2294,6 @@ async function payoutMilestone(jobId, milestoneIndex) {
       chain: arcTestnet,
       transport: custom(window.ethereum)
     });
-
-    const contractAddress = systemStatus.value.contractAddress;
     
     const tx = await walletClient.writeContract({
       address: contractAddress,
@@ -1910,6 +2342,46 @@ async function raiseDispute(jobId) {
     return;
   }
   
+  if (circleUserWallet.value) {
+    modals.confirm(
+      'Initiate Dispute Review?',
+      'Are you sure you want to raise a dispute? This locks the remaining escrow milestones and stakes, and triggers peer juror governance review.',
+      async () => {
+        isSubmitting.value = true;
+        modals.loading('Submitting Dispute Registration', 'Processing (Gasless Sponsored Transaction)...');
+        try {
+          await executeSponsoredTransaction({
+            walletId: circleUserWallet.value.id,
+            contractAddress: systemStatus.value.contractAddress,
+            abiFunctionSignature: 'initiateDispute(uint256)',
+            abiParameters: [jobId.toString()],
+            userToken: circleSessionToken.value,
+            userAddress: userAddress.value,
+            isSimulation: isSimulationMode.value,
+            executeChallengeFn: executeChallenge
+          });
+
+          const job = jobsList.value.find(j => j.id === jobId);
+          const updatedJob = { ...job, status: 'Disputed' };
+          await $fetch('/api/jobs', { method: 'POST', body: updatedJob });
+
+          closeModal();
+          modals.success('Dispute Active', 'Secure lock completed. Peer jurors have been summoned to analyze and vote on this project dispute.');
+          await loadJobsFromLocalDb();
+        } catch (e) {
+          console.error('Circle dispute failed:', e);
+          closeModal();
+          modals.error('Dispute Failed', e.message || 'Circle transaction failed.');
+        } finally {
+          isSubmitting.value = false;
+        }
+      },
+      null,
+      { isDestructive: true, primaryLabel: 'Yes, Lock Escrow & Disagree' }
+    );
+    return;
+  }
+
   modals.confirm(
     'Initiate Dispute Review?',
     'Are you sure you want to raise a dispute? This locks the remaining escrow milestones and stakes, and triggers peer juror governance review.',
@@ -1967,6 +2439,35 @@ async function registerJuror() {
     modals.warning('Wallet Disconnected', 'Please connect your EVM wallet first to register as a dispute juror.');
     return;
   }
+
+  if (circleUserWallet.value) {
+    isSubmitting.value = true;
+    modals.loading('Summoning Juror Board', 'Processing (Gasless Sponsored Transaction)...');
+    try {
+      await executeSponsoredTransaction({
+        walletId: circleUserWallet.value.id,
+        contractAddress: systemStatus.value.contractAddress,
+        abiFunctionSignature: 'registerAsJuror()',
+        abiParameters: [],
+        userToken: circleSessionToken.value,
+        userAddress: userAddress.value,
+        isSimulation: isSimulationMode.value,
+        executeChallengeFn: executeChallenge
+      });
+
+      closeModal();
+      modals.success('Juror Enrolled!', 'You have successfully enrolled in the decentralized arbitrator jury board! You can now analyze and vote on active contract disputes.');
+      await fetchUserBlockchainDetails();
+    } catch (e) {
+      console.error('Circle juror registration failed:', e);
+      closeModal();
+      modals.error('Registration Failed', e.message || 'Circle transaction failed.');
+    } finally {
+      isSubmitting.value = false;
+    }
+    return;
+  }
+
   isSubmitting.value = true;
   modals.loading('Summoning Juror Board', 'Confirming juror registration on Arc Testnet. Please sign in your wallet extension...');
   try {
@@ -2004,9 +2505,38 @@ async function voteDispute(jobId, option) {
     modals.warning('Wallet Disconnected', 'Please connect your wallet to submit votes.');
     return;
   }
-  isSubmitting.value = true;
-  
+
   const optionStr = option === 1 ? 'Client Payout' : option === 2 ? 'Freelancer Refund' : 'Split budget evenly';
+
+  if (circleUserWallet.value) {
+    isSubmitting.value = true;
+    modals.loading('Casting Arbitration Vote', `Processing (Gasless Sponsored Transaction)...`);
+    try {
+      await executeSponsoredTransaction({
+        walletId: circleUserWallet.value.id,
+        contractAddress: systemStatus.value.contractAddress,
+        abiFunctionSignature: 'voteOnDispute(uint256,uint8)',
+        abiParameters: [jobId.toString(), option.toString()],
+        userToken: circleSessionToken.value,
+        userAddress: userAddress.value,
+        isSimulation: isSimulationMode.value,
+        executeChallengeFn: executeChallenge
+      });
+
+      closeModal();
+      modals.success('Arbitration Vote Casted!', `Successfully submitted your vote: "${optionStr}" on Job #${jobId}. Thank you for securing the ecosystem!`);
+      await fetchDisputeVotesStanding(jobId);
+    } catch (e) {
+      console.error('Circle vote failed:', e);
+      closeModal();
+      modals.error('Voting Failed', e.message || 'Circle transaction failed.');
+    } finally {
+      isSubmitting.value = false;
+    }
+    return;
+  }
+
+  isSubmitting.value = true;
   modals.loading('Casting Arbitration Vote', `Voting option: "${optionStr}" for Job #${jobId}. Confirming signature request...`);
   
   try {
@@ -2045,6 +2575,43 @@ async function resolveDispute(jobId) {
     modals.warning('Wallet Disconnected', 'Please connect your wallet first.');
     return;
   }
+
+  if (circleUserWallet.value) {
+    isSubmitting.value = true;
+    modals.loading('Resolving Project Escrow', `Processing (Gasless Sponsored Transaction)...`);
+    try {
+      await executeSponsoredTransaction({
+        walletId: circleUserWallet.value.id,
+        contractAddress: systemStatus.value.contractAddress,
+        abiFunctionSignature: 'resolveDispute(uint256)',
+        abiParameters: [jobId.toString()],
+        userToken: circleSessionToken.value,
+        userAddress: userAddress.value,
+        isSimulation: isSimulationMode.value,
+        executeChallengeFn: executeChallenge
+      });
+
+      const job = jobsList.value.find(j => j.id === jobId);
+      const updatedJob = { ...job, status: 'Resolved' };
+      
+      await $fetch('/api/jobs', {
+        method: 'POST',
+        body: updatedJob
+      });
+
+      closeModal();
+      modals.success('Escrow Dispute Resolved!', `Securely settled Job #${jobId}. Funds and juror reputation incentives have been completely disbursed!`);
+      await loadJobsFromLocalDb();
+    } catch (e) {
+      console.error('Circle dispute resolution failed:', e);
+      closeModal();
+      modals.error('Resolution Failed', e.message || 'Circle transaction failed.');
+    } finally {
+      isSubmitting.value = false;
+    }
+    return;
+  }
+
   isSubmitting.value = true;
   modals.loading('Resolving Project Escrow', `Compiling consensus votes and executing payouts for Job #${jobId}...`);
   try {
