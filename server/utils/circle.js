@@ -160,3 +160,92 @@ export async function executeEscrowApproval(jobId, milestoneIndex) {
     }
   }
 }
+
+// Relays permissionless CCTP minting on Arc Testnet gaslessly
+export async function executeReceiveMessage(messageBytes, attestationSignature) {
+  const status = getCircleConfigStatus();
+  console.log(`Executing CCTP receiveMessage. Mode: ${status.mode}`);
+
+  const transmitterAddress = '0x26413b5220c926949a0e6760f38b16c1E11D3156';
+  const abiFunctionSignature = 'receiveMessage(bytes,bytes)';
+  const abiParameters = [messageBytes, attestationSignature];
+
+  if (status.mode === 'CIRCLE_DCW') {
+    const client = new CircleDeveloperControlledWalletsClient({
+      apiKey: process.env.CIRCLE_API_KEY,
+      entitySecret: process.env.CIRCLE_ENTITY_SECRET,
+    });
+
+    const idempotencyKey = crypto.randomUUID();
+    
+    try {
+      const response = await client.createContractExecutionTransaction({
+        walletId: process.env.CIRCLE_WALLET_ID,
+        contractAddress: transmitterAddress,
+        abiFunctionSignature: abiFunctionSignature,
+        abiParameters: abiParameters,
+        feeLevel: 'MEDIUM',
+        idempotencyKey: idempotencyKey,
+      });
+
+      console.log('Circle DCW receiveMessage response:', response);
+      return {
+        success: true,
+        txHash: response.txHash || 'Pending',
+      };
+    } catch (error) {
+      console.error('Circle DCW CCTP receiveMessage failed:', error);
+      throw error;
+    }
+  } else {
+    const privateKey = process.env.PRIVATE_KEY;
+    if (!privateKey || privateKey.startsWith('0x0000')) {
+      throw new Error('Local fallback private key is not configured. Please add PRIVATE_KEY to .env');
+    }
+
+    const account = privateKeyToAccount(privateKey);
+    const walletClient = createWalletClient({
+      account,
+      chain: arcTestnet,
+      transport: http(),
+    });
+
+    const publicClient = createPublicClient({
+      chain: arcTestnet,
+      transport: http(),
+    });
+
+    const abi = [
+      {
+        name: 'receiveMessage',
+        type: 'function',
+        stateMutability: 'nonpayable',
+        inputs: [
+          { name: 'message', type: 'bytes' },
+          { name: 'attestation', type: 'bytes' }
+        ],
+        outputs: [{ name: 'success', type: 'bool' }]
+      }
+    ];
+
+    try {
+      const hash = await walletClient.writeContract({
+        address: transmitterAddress,
+        abi,
+        functionName: 'receiveMessage',
+        args: [messageBytes, attestationSignature],
+      });
+
+      console.log(`Viem CCTP receiveMessage sent: ${hash}`);
+      await publicClient.waitForTransactionReceipt({ hash });
+
+      return {
+        success: true,
+        txHash: hash,
+      };
+    } catch (error) {
+      console.error('Viem CCTP receiveMessage failed:', error);
+      throw error;
+    }
+  }
+}
