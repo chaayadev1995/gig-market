@@ -32,7 +32,7 @@
           Connect Wallet
         </button>
         <div v-else class="rainbow-connected-pill" @click="openConnectedModal">
-          <span class="rainbow-connected-balance">{{ userUsdcBalance }} USDC</span>
+          <span class="rainbow-connected-balance">{{ userUsdcBalance }} USDC | {{ userEurcBalance }} EURC</span>
           <div class="rainbow-connected-address-pill">
             <div class="status-dot"></div>
             <span class="rainbow-connected-address">{{ shortAddress(userAddress) }}</span>
@@ -244,6 +244,36 @@
           </div>
         </div>
 
+        <!-- StableFX Exchange Desk & Wallet Balances -->
+        <div class="glass-panel" style="margin-bottom: 24px; border-color: var(--accent-purple); box-shadow: 4px 4px 0px var(--accent-purple); background: var(--bg-secondary); display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; padding: 20px;">
+          <div>
+            <div style="font-size: 11px; font-family: var(--font-display); font-weight: 700; text-transform: uppercase; color: var(--accent-purple); margin-bottom: 4px;">💱 StableFX Exchange Rate</div>
+            <div style="font-size: 24px; font-family: var(--font-display); font-weight: 800; color: var(--text-primary);">
+              1 USDC = {{ liveQuoteRate ? liveQuoteRate.toFixed(4) : '0.9200' }} EURC
+            </div>
+            <div style="font-size: 12px; color: var(--text-secondary);">
+              Circle FX engine quote rate
+              <span v-if="quoteExpiresInSeconds > 0" style="color: var(--accent-orange); font-weight: 700;"> (Expires in {{ quoteExpiresInSeconds }}s)</span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-family: var(--font-display); font-weight: 700; text-transform: uppercase; color: var(--accent-teal); margin-bottom: 4px;">💵 USDC Balance</div>
+            <div style="font-size: 24px; font-family: var(--font-display); font-weight: 800; color: var(--accent-teal);">{{ userUsdcBalance }} USDC</div>
+            <div style="font-size: 12px; color: var(--text-secondary);">Available on Arc Testnet</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-family: var(--font-display); font-weight: 700; text-transform: uppercase; color: var(--accent-green); margin-bottom: 4px;">💶 EURC Balance</div>
+            <div style="font-size: 24px; font-family: var(--font-display); font-weight: 800; color: var(--accent-green);">{{ userEurcBalance }} EURC</div>
+            <div style="font-size: 12px; color: var(--text-secondary);">Available on Arc Testnet</div>
+          </div>
+          <div style="display: flex; flex-direction: column; justify-content: center;">
+            <button class="btn btn-accent btn-small" style="margin: 0; padding: 10px 14px;" @click="refreshFxQuote" :disabled="isRefreshingQuote">
+              <span v-if="isRefreshingQuote">Fetching Quote...</span>
+              <span v-else>🔄 Refresh FX Quote</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Sub Tab Navigation links inside the Portal view -->
         <div class="nav-links" style="display: inline-flex; gap: 8px; margin-bottom: 24px; padding: 4px; border: var(--border-width) solid var(--border-color); border-radius: var(--border-radius-sm);">
           <span class="nav-link" :class="{ active: currentTab === 'client' }" @click="currentTab = 'client'">Client Portal</span>
@@ -377,7 +407,15 @@
                 <div style="margin-top: 15px;">
                   <h5 style="font-size: 13px; margin-bottom: 8px; color: var(--accent-teal-dark);">Milestones Details</h5>
                   <div v-for="(m, idx) in job.milestones" :key="idx" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg-secondary); border: 1.5px solid var(--border-color); margin-bottom: 6px; border-radius: 8px;">
-                    <span style="font-size: 14px; font-weight: 600;">{{ idx + 1 }}. {{ m.title }} ({{ m.budget }} USDC)</span>
+                    <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                      <span style="font-size: 14px; font-weight: 600;">{{ idx + 1 }}. {{ m.title }}</span>
+                      <span style="font-size: 12px; color: var(--text-secondary);">
+                        Budget: {{ m.budget }} USDC
+                        <span v-if="job.payoutCurrency === 'EURC'" style="color: var(--accent-purple); font-weight: 700;">
+                          (Est. {{ (m.budget * liveQuoteRate).toFixed(2) }} EURC)
+                        </span>
+                      </span>
+                    </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
                       <span v-if="m.approved" class="badge badge-completed" style="font-size: 10px; padding: 2px 8px;">Paid</span>
                       <button v-else-if="job.status === 'Active' && job.currentMilestone == idx" class="btn btn-primary btn-small" style="padding: 4px 10px; border-radius: 6px;" @click="payoutMilestone(job.id, idx)">
@@ -454,7 +492,12 @@
                   <div class="gig-meta">
                     <div class="gig-meta-item">
                       <span class="gig-meta-label">Budget</span>
-                      <span class="gig-meta-value" style="color: var(--accent-teal-dark);">{{ job.budget }} USDC</span>
+                      <span class="gig-meta-value" style="color: var(--accent-teal-dark);">
+                        {{ job.budget }} USDC
+                        <span style="font-size: 11px; color: var(--accent-purple); font-weight: 700;">
+                          (Est. {{ (job.budget * liveQuoteRate).toFixed(2) }} EURC)
+                        </span>
+                      </span>
                     </div>
                     <div class="gig-meta-item">
                       <span class="gig-meta-label">Your Required Stake</span>
@@ -529,6 +572,20 @@
                     <div style="display: flex; gap: 12px; margin-top: 4px;">
                       <a v-if="job.burnTxHash" :href="getTxExplorerUrl(job.sourceChain, job.burnTxHash)" target="_blank" style="color: var(--text-primary); text-decoration: underline; font-weight: 700;">Burn Tx ↗</a>
                       <a v-if="job.mintTxHash" :href="getTxExplorerUrl('Arc_Testnet', job.mintTxHash)" target="_blank" style="color: var(--text-primary); text-decoration: underline; font-weight: 700;">Mint Tx ↗</a>
+                    </div>
+                  </div>
+
+                  <!-- Payout Currency Preference Selector -->
+                  <div style="margin-top: 15px; border-top: 2.5px solid var(--border-color); padding-top: 15px; margin-bottom: 15px;">
+                    <label class="form-label" style="font-weight: 700;">Preferred Payout Currency</label>
+                    <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px;">
+                      <select v-model="job.payoutCurrency" class="form-input" style="padding: 8px 12px; font-size: 13px; width: 150px;" @change="updatePayoutCurrencyPreference(job)">
+                        <option value="USDC">USDC (default)</option>
+                        <option value="EURC">EURC (StableFX Swap)</option>
+                      </select>
+                      <span style="font-size: 12px; color: var(--text-secondary);">
+                        Currently Settling: <strong>{{ job.payoutCurrency || 'USDC' }}</strong>
+                      </span>
                     </div>
                   </div>
 
@@ -1638,6 +1695,12 @@ const bridgeStep = ref(0);
 const bridgeStatusText = ref('');
 const bridgeTxHashes = ref({ burn: '', mint: '', attestation: '', escrow: '' });
 
+// StableFX State Variables
+const liveQuoteRate = ref(0.92);
+const quoteExpiresInSeconds = ref(0);
+const isRefreshingQuote = ref(false);
+let quoteTimer = null;
+
 function getTxExplorerUrl(chainKey, hash) {
   if (!hash || hash.startsWith('mock_')) return '#';
   if (chainKey === 'Base_Sepolia') return `https://sepolia.basescan.org/tx/${hash}`;
@@ -1851,6 +1914,7 @@ const disputedJobs = computed(() => jobsList.value.filter(j => j.status === 'Dis
 onMounted(async () => {
   await fetchSystemStatus();
   await loadJobsFromLocalDb();
+  await refreshFxQuote();
 
   // 1. Check for persisted Circle User Wallet first
   checkPersistedWallet();
@@ -1898,6 +1962,88 @@ function handleCancel() {
     modal.onCancel();
   } else {
     closeModal();
+  }
+}
+
+async function refreshFxQuote() {
+  isRefreshingQuote.value = true;
+  try {
+    const res = await $fetch('/api/stablefx-quote?amount=1.00');
+    if (res && res.success) {
+      liveQuoteRate.value = res.rate;
+      const exp = new Date(res.expiresAt).getTime();
+      const diff = Math.max(0, Math.floor((exp - Date.now()) / 1000));
+      quoteExpiresInSeconds.value = diff;
+      
+      if (quoteTimer) clearInterval(quoteTimer);
+      quoteTimer = setInterval(() => {
+        if (quoteExpiresInSeconds.value > 0) {
+          quoteExpiresInSeconds.value--;
+        } else {
+          clearInterval(quoteTimer);
+        }
+      }, 1000);
+    }
+  } catch (err) {
+    console.warn('Failed to fetch StableFX quote:', err);
+  } finally {
+    isRefreshingQuote.value = false;
+  }
+}
+
+async function updatePayoutCurrencyPreference(job) {
+  if (!userAddress.value) {
+    modals.warning('Wallet Disconnected', 'Please connect your EVM wallet first to update payout settings.');
+    return;
+  }
+  const contractAddress = systemStatus.value.contractAddress;
+  const currency = job.payoutCurrency || 'USDC';
+
+  isSubmitting.value = true;
+  modals.loading('Updating Payout Currency', `Setting preferred payout currency to ${currency} for Job #${job.id}...`);
+
+  try {
+    if (circleUserWallet.value) {
+      await executeSponsoredTransaction({
+        walletId: circleUserWallet.value.id,
+        contractAddress: contractAddress,
+        abiFunctionSignature: 'setPayoutCurrency(uint256,string)',
+        abiParameters: [job.id.toString(), currency],
+        userToken: circleSessionToken.value,
+        userAddress: userAddress.value,
+        isSimulation: isSimulationMode.value,
+        executeChallengeFn: executeChallenge
+      });
+    } else {
+      const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
+      const walletClient = createWalletClient({
+        account: userAddress.value,
+        chain: arcTestnet,
+        transport: custom(window.ethereum)
+      });
+      const tx = await walletClient.writeContract({
+        address: contractAddress,
+        abi: GIGMARKET_ESCROW_ABI,
+        functionName: 'setPayoutCurrency',
+        args: [BigInt(job.id), currency]
+      });
+      closeModal();
+      modals.txPending(tx, `Updating payout currency preference on-chain. Please wait...`);
+      await publicClient.waitForTransactionReceipt({ hash: tx });
+    }
+
+    const updatedJob = { ...job, payoutCurrency: currency };
+    await $fetch('/api/jobs', { method: 'POST', body: updatedJob });
+
+    closeModal();
+    modals.success('Payout Preference Saved!', `Successfully set payout preference to ${currency} for Job #${job.id}.`);
+    await loadJobsFromLocalDb();
+  } catch (err) {
+    console.error('Failed to update payout currency preference:', err);
+    closeModal();
+    modals.error('Update Failed', err.message || 'Transaction failed.');
+  } finally {
+    isSubmitting.value = false;
   }
 }
 
@@ -2591,7 +2737,11 @@ async function payoutMilestone(jobId, milestoneIndex) {
       });
 
       closeModal();
-      modals.success('Milestone Payout Disbursed!', `Successfully transferred milestone funds to the freelancer's wallet and unlocked proportional staking collateral!`);
+      const isEurc = job.payoutCurrency === 'EURC';
+      const successMsg = isEurc
+        ? `Successfully swapped milestone funds via Circle StableFX on-chain and disbursed EURC payout to the freelancer's wallet, along with unlocking proportional collateral!`
+        : `Successfully transferred milestone funds to the freelancer's wallet and unlocked proportional staking collateral!`;
+      modals.success(isEurc ? 'StableFX Payout Swapped & Disbursed!' : 'Milestone Payout Disbursed!', successMsg);
       await loadJobsFromLocalDb();
       await fetchUserBlockchainDetails();
     } catch (e) {
@@ -2643,7 +2793,11 @@ async function payoutMilestone(jobId, milestoneIndex) {
     });
 
     closeModal();
-    modals.success('Milestone Payout Disbursed!', `Successfully transferred milestone funds to the freelancer's wallet and unlocked proportional staking collateral!`);
+    const isEurc = job.payoutCurrency === 'EURC';
+    const successMsg = isEurc
+      ? `Successfully swapped milestone funds via Circle StableFX on-chain and disbursed EURC payout to the freelancer's wallet, along with unlocking proportional collateral!`
+      : `Successfully transferred milestone funds to the freelancer's wallet and unlocked proportional staking collateral!`;
+    modals.success(isEurc ? 'StableFX Payout Swapped & Disbursed!' : 'Milestone Payout Disbursed!', successMsg);
     await loadJobsFromLocalDb();
     await fetchUserBlockchainDetails();
   } catch (e) {
@@ -2996,9 +3150,14 @@ async function simulatePrMerge(jobId) {
     if (response.error) {
       modals.error('Simulation Failed', response.error);
     } else {
+      const job = jobsList.value.find(j => j.id === jobId);
+      const isEurc = job && job.payoutCurrency === 'EURC';
+      const msg = isEurc
+        ? `Autonomous integration verified! GitHub triggered automatic escrow payout release on Arc Testnet via Circle StableFX. Swapped USDC and settled EURC in freelancer's wallet.\n\nMode: ${response.mode}\nTx Hash: ${response.txHash.slice(0, 18) + '...'}`
+        : `Autonomous integration verified! GitHub triggered automatic escrow payout release on Arc Testnet.\n\nMode: ${response.mode}\nTx Hash: ${response.txHash.slice(0, 18) + '...'}`;
       modals.success(
-        'Git PR Merge Detected!',
-        `Autonomous integration verified! Github triggered automatic escrow payout release on Arc Testnet.\n\nMode: ${response.mode}\nTx Hash: ${response.txHash.slice(0, 18) + '...'}`
+        isEurc ? 'Git PR Merge: StableFX Swap Payout!' : 'Git PR Merge Detected!',
+        msg
       );
       await loadJobsFromLocalDb();
       await fetchUserBlockchainDetails();
