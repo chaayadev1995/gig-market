@@ -282,6 +282,34 @@
                 </div>
               </div>
 
+              <!-- Funding Method Selection -->
+              <div class="form-group" style="margin-top: 15px;">
+                <label class="form-label">Funding Method</label>
+                <div style="display: flex; gap: 16px; margin-top: 4px;">
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--text-primary);">
+                    <input type="radio" v-model="fundingMethod" value="arc" style="accent-color: var(--accent-teal);" />
+                    Direct Arc Deposit
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--text-primary);">
+                    <input type="radio" v-model="fundingMethod" value="cross-chain" style="accent-color: var(--accent-teal);" />
+                    Pay from External Chain (CCTP)
+                  </label>
+                </div>
+              </div>
+
+              <!-- Source Chain Dropdown Selection -->
+              <div v-if="fundingMethod === 'cross-chain'" class="form-group" style="margin-top: 15px; background: var(--bg-secondary); border: 2px solid var(--border-color); padding: 12px; border-radius: var(--border-radius-sm);">
+                <label class="form-label" style="color: var(--accent-purple); font-weight: 700;">Select Source Network (Circle CCTP)</label>
+                <select v-model="sourceChain" class="form-input" style="width: 100%; margin-top: 6px; padding: 10px;">
+                  <option value="Base_Sepolia">Base Sepolia</option>
+                  <option value="Ethereum_Sepolia">Ethereum Sepolia</option>
+                  <option value="Arbitrum_Sepolia">Arbitrum Sepolia</option>
+                </select>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-top: 8px; line-height: 1.4;">
+                  ⚡ CCTP will burn USDC on the source network, then automatically execute a gasless sponsored mint and escrow deposit on Arc Testnet.
+                </p>
+              </div>
+
               <!-- Milestones Input Fields -->
               <div v-if="newJob.milestones.length > 0" style="margin-top: 15px;">
                 <h4 style="font-size: 14px; margin-bottom: 10px; color: var(--accent-teal-dark);">Setup Milestones Budgets</h4>
@@ -329,6 +357,19 @@
                   <div class="gig-meta-item">
                     <span class="gig-meta-label">Required Stake</span>
                     <span class="gig-meta-value">{{ job.requiredStake }} USDC</span>
+                  </div>
+                </div>
+
+                <!-- CCTP Bridged Escrow Details -->
+                <div v-if="job.fundingMethod === 'cross-chain'" style="margin-top: 15px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-family: monospace; background: var(--accent-teal-light); border: 2.5px solid var(--border-color); padding: 10px; border-radius: var(--border-radius-sm);">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 700; color: var(--accent-teal-dark);">🔀 CCTP Bridged (from {{ job.sourceChain ? job.sourceChain.replace('_', ' ') : 'Base Sepolia' }})</span>
+                    <span v-if="job.bridgeVerified" style="color: var(--accent-green); font-weight: 700;">✓ Verified</span>
+                    <span v-else style="color: var(--accent-orange); font-weight: 700;">⚠ Verification Pending</span>
+                  </div>
+                  <div style="display: flex; gap: 12px; margin-top: 4px;">
+                    <a v-if="job.burnTxHash" :href="getTxExplorerUrl(job.sourceChain, job.burnTxHash)" target="_blank" style="color: var(--text-primary); text-decoration: underline; font-weight: 700;">Burn Tx ↗</a>
+                    <a v-if="job.mintTxHash" :href="getTxExplorerUrl('Arc_Testnet', job.mintTxHash)" target="_blank" style="color: var(--text-primary); text-decoration: underline; font-weight: 700;">Mint Tx ↗</a>
                   </div>
                 </div>
 
@@ -424,6 +465,20 @@
                       <span class="gig-meta-value" style="color: var(--accent-purple);">{{ freelancerReputation >= 5 ? 'Elite (0%)' : (freelancerReputation >= 3 ? 'Exp (5%)' : 'Std (10%)') }}</span>
                     </div>
                   </div>
+
+                  <!-- CCTP Bridged Escrow Details -->
+                  <div v-if="job.fundingMethod === 'cross-chain'" style="margin-top: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-family: monospace; background: var(--accent-teal-light); border: 2.5px solid var(--border-color); padding: 10px; border-radius: var(--border-radius-sm);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-weight: 700; color: var(--accent-teal-dark);">🔀 CCTP Bridged (from {{ job.sourceChain ? job.sourceChain.replace('_', ' ') : 'Base Sepolia' }})</span>
+                      <span v-if="job.bridgeVerified" style="color: var(--accent-green); font-weight: 700;">✓ Verified</span>
+                      <span v-else style="color: var(--accent-orange); font-weight: 700;">⚠ Verification Pending</span>
+                    </div>
+                    <div style="display: flex; gap: 12px; margin-top: 4px;">
+                      <a v-if="job.burnTxHash" :href="getTxExplorerUrl(job.sourceChain, job.burnTxHash)" target="_blank" style="color: var(--text-primary); text-decoration: underline; font-weight: 700;">Burn Tx ↗</a>
+                      <a v-if="job.mintTxHash" :href="getTxExplorerUrl('Arc_Testnet', job.mintTxHash)" target="_blank" style="color: var(--text-primary); text-decoration: underline; font-weight: 700;">Mint Tx ↗</a>
+                    </div>
+                  </div>
+
                   <div style="display: flex; justify-content: flex-end;">
                     <button class="btn btn-primary btn-small" @click="joinGig(job)" :disabled="isSubmitting">
                       Approve & Stake to Join
@@ -461,6 +516,19 @@
                     <div class="gig-meta-item">
                       <span class="gig-meta-label">Current Milestone</span>
                       <span class="gig-meta-value" style="color: var(--accent-teal-dark);">{{ job.currentMilestone + 1 }} / {{ job.milestones.length }}</span>
+                    </div>
+                  </div>
+
+                  <!-- CCTP Bridged Escrow Details -->
+                  <div v-if="job.fundingMethod === 'cross-chain'" style="margin-top: 15px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-family: monospace; background: var(--accent-teal-light); border: 2.5px solid var(--border-color); padding: 10px; border-radius: var(--border-radius-sm);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-weight: 700; color: var(--accent-teal-dark);">🔀 CCTP Bridged (from {{ job.sourceChain ? job.sourceChain.replace('_', ' ') : 'Base Sepolia' }})</span>
+                      <span v-if="job.bridgeVerified" style="color: var(--accent-green); font-weight: 700;">✓ Verified</span>
+                      <span v-else style="color: var(--accent-orange); font-weight: 700;">⚠ Verification Pending</span>
+                    </div>
+                    <div style="display: flex; gap: 12px; margin-top: 4px;">
+                      <a v-if="job.burnTxHash" :href="getTxExplorerUrl(job.sourceChain, job.burnTxHash)" target="_blank" style="color: var(--text-primary); text-decoration: underline; font-weight: 700;">Burn Tx ↗</a>
+                      <a v-if="job.mintTxHash" :href="getTxExplorerUrl('Arc_Testnet', job.mintTxHash)" target="_blank" style="color: var(--text-primary); text-decoration: underline; font-weight: 700;">Mint Tx ↗</a>
                     </div>
                   </div>
 
@@ -1336,6 +1404,109 @@
         </div>
       </div>
 
+      <!-- CCTP Bridge Progress Modal -->
+      <div v-if="isBridging" class="wallet-modal-overlay" style="pointer-events: auto;">
+        <div class="wallet-modal-container universal-modal-container" style="max-width: 500px; pointer-events: auto;">
+          <div class="wallet-modal-header universal-modal-header" style="padding: 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span class="wallet-modal-title" style="font-size: 18px; display: flex; align-items: center; gap: 8px;">
+                🔀 Cross-Chain CCTP Deposit
+              </span>
+            </div>
+            <button v-if="bridgeStep === 5 || bridgeStep === -1" class="wallet-modal-close" @click="isBridging = false">×</button>
+          </div>
+          
+          <div class="wallet-modal-detail" style="padding: 24px; text-align: left; align-items: flex-start; justify-content: flex-start; min-height: auto; width: 100%;">
+            <p style="font-size: 14px; color: var(--text-primary); font-weight: 600; line-height: 1.5; margin: 0 0 16px 0;">
+              Bridging stablecoin budget from {{ sourceChain ? sourceChain.replace('_', ' ') : '' }} to Arc Testnet. Follow the progress below:
+            </p>
+
+            <!-- Steps list -->
+            <div style="display: flex; flex-direction: column; gap: 16px; width: 100%; margin-bottom: 20px;">
+              <!-- Step 1: Burn -->
+              <div style="display: flex; align-items: flex-start; gap: 12px;">
+                <div style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold;"
+                     :style="bridgeStep > 1 ? 'background: var(--accent-green); color: white; border-color: var(--accent-green);' : (bridgeStep === 1 ? 'background: var(--accent-orange); color: white; border-color: var(--accent-orange);' : 'background: var(--bg-secondary);')">
+                  <span v-if="bridgeStep > 1">✓</span>
+                  <span v-else>1</span>
+                </div>
+                <div>
+                  <div style="font-weight: 700; font-size: 14px;">Source Burn (CCTP)</div>
+                  <div style="font-size: 12px; color: var(--text-secondary);">Burn USDC on {{ sourceChain ? sourceChain.replace('_', ' ') : '' }}</div>
+                  <div v-if="bridgeTxHashes.burn" style="font-size: 11px; font-family: monospace; word-break: break-all; margin-top: 4px; color: var(--accent-teal-dark);">
+                    Tx: <a :href="getTxExplorerUrl(sourceChain, bridgeTxHashes.burn)" target="_blank" style="text-decoration: underline; font-weight: 700;">{{ bridgeTxHashes.burn.slice(0, 16) }}...</a>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 2: Attestation -->
+              <div style="display: flex; align-items: flex-start; gap: 12px;">
+                <div style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold;"
+                     :style="bridgeStep > 2 ? 'background: var(--accent-green); color: white; border-color: var(--accent-green);' : (bridgeStep === 2 ? 'background: var(--accent-orange); color: white; border-color: var(--accent-orange);' : 'background: var(--bg-secondary);')">
+                  <span v-if="bridgeStep > 2">✓</span>
+                  <span v-else>2</span>
+                </div>
+                <div>
+                  <div style="font-weight: 700; font-size: 14px;">Attestation Generation</div>
+                  <div style="font-size: 12px; color: var(--text-secondary);">Retrieve Circle validation signature</div>
+                  <div v-if="bridgeTxHashes.attestation" style="font-size: 11px; font-family: monospace; word-break: break-all; margin-top: 4px; color: var(--accent-purple);">
+                    Attestation: Signature Secured
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 3: Arc Mint -->
+              <div style="display: flex; align-items: flex-start; gap: 12px;">
+                <div style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold;"
+                     :style="bridgeStep > 3 ? 'background: var(--accent-green); color: white; border-color: var(--accent-green);' : (bridgeStep === 3 ? 'background: var(--accent-orange); color: white; border-color: var(--accent-orange);' : 'background: var(--bg-secondary);')">
+                  <span v-if="bridgeStep > 3">✓</span>
+                  <span v-else>3</span>
+                </div>
+                <div>
+                  <div style="font-weight: 700; font-size: 14px;">Arc Mint (Gasless)</div>
+                  <div style="font-size: 12px; color: var(--text-secondary);">Mint USDC on Arc Testnet via paymaster</div>
+                  <div v-if="bridgeTxHashes.mint" style="font-size: 11px; font-family: monospace; word-break: break-all; margin-top: 4px; color: var(--accent-teal-dark);">
+                    Tx: <a :href="getTxExplorerUrl('Arc_Testnet', bridgeTxHashes.mint)" target="_blank" style="text-decoration: underline; font-weight: 700;">{{ bridgeTxHashes.mint.slice(0, 16) }}...</a>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 4: Escrow Deposit -->
+              <div style="display: flex; align-items: flex-start; gap: 12px;">
+                <div style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold;"
+                     :style="bridgeStep > 4 ? 'background: var(--accent-green); color: white; border-color: var(--accent-green);' : (bridgeStep === 4 ? 'background: var(--accent-orange); color: white; border-color: var(--accent-orange);' : 'background: var(--bg-secondary);')">
+                  <span v-if="bridgeStep > 4">✓</span>
+                  <span v-else>4</span>
+                </div>
+                <div>
+                  <div style="font-weight: 700; font-size: 14px;">Escrow Deposit & Create Job</div>
+                  <div style="font-size: 12px; color: var(--text-secondary);">Fund smart contract escrow wallet</div>
+                  <div v-if="bridgeTxHashes.escrow" style="font-size: 11px; font-family: monospace; word-break: break-all; margin-top: 4px; color: var(--accent-teal-dark);">
+                    Tx: <a :href="getTxExplorerUrl('Arc_Testnet', bridgeTxHashes.escrow)" target="_blank" style="text-decoration: underline; font-weight: 700;">{{ bridgeTxHashes.escrow.slice(0, 16) }}...</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Current Status Box -->
+            <div style="width: 100%; padding: 12px; background: var(--bg-secondary); border: 2.5px solid var(--border-color); border-radius: var(--border-radius-sm); margin-bottom: 16px;">
+              <span style="font-size: 11px; font-family: monospace; font-weight: 700; text-transform: uppercase; color: var(--text-secondary);">Status</span>
+              <p style="font-size: 13px; font-weight: 600; margin: 4px 0 0 0; color: var(--text-primary);">
+                {{ bridgeStatusText }}
+              </p>
+            </div>
+
+            <!-- Action buttons -->
+            <div style="display: flex; gap: 12px; width: 100%; justify-content: flex-end;">
+              <button v-if="bridgeStep === 5 || bridgeStep === -1" class="btn btn-accent" style="margin: 0;" @click="isBridging = false">
+                {{ bridgeStep === 5 ? 'Done' : 'Close' }}
+              </button>
+              <div v-else class="modal-mini-spinner" style="width: 20px; height: 20px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </main>
   </div>
 </template>
@@ -1368,6 +1539,11 @@ import {
   sponsoredGasSaved,
   executeSponsoredTransaction
 } from './utils/modular-wallet';
+import {
+  initiateBurn,
+  pollBridgeAttestation,
+  mintOnArc
+} from './utils/bridge-kit';
 
 const circleEmail = ref('');
 const showPinScreen = ref(false);
@@ -1453,6 +1629,22 @@ const systemStatus = ref({});
 const isSystemLoading = ref(true);
 const loadingJobs = ref(true);
 const isSubmitting = ref(false);
+
+// Cross-chain CCTP Bridge States
+const fundingMethod = ref('arc');
+const sourceChain = ref('Base_Sepolia');
+const isBridging = ref(false);
+const bridgeStep = ref(0);
+const bridgeStatusText = ref('');
+const bridgeTxHashes = ref({ burn: '', mint: '', attestation: '', escrow: '' });
+
+function getTxExplorerUrl(chainKey, hash) {
+  if (!hash || hash.startsWith('mock_')) return '#';
+  if (chainKey === 'Base_Sepolia') return `https://sepolia.basescan.org/tx/${hash}`;
+  if (chainKey === 'Ethereum_Sepolia') return `https://sepolia.etherscan.io/tx/${hash}`;
+  if (chainKey === 'Arbitrum_Sepolia') return `https://sepolia-rollup.arbitrum.io/tx/${hash}`;
+  return `https://testnet.arcscan.app/tx/${hash}`;
+}
 
 // RainbowKit custom theme connection states
 const isWalletModalOpen = ref(false);
@@ -1912,10 +2104,139 @@ async function createGig() {
   const milestoneBudgets = newJob.value.milestones.map(m => parseUnits(m.budget.toString(), 6));
   const milestoneTitles = newJob.value.milestones.map(m => m.title);
 
+  // --- CROSS-CHAIN DEPOSIT (CCTP) FLOW ---
+  if (fundingMethod.value === 'cross-chain') {
+    isSubmitting.value = true;
+    isBridging.value = true;
+    bridgeStep.value = 1;
+    bridgeStatusText.value = `Initiating burn of ${newJob.value.budget} USDC on ${sourceChain.value}. Please confirm the approval and burn transaction in your wallet...`;
+    bridgeTxHashes.value = { burn: '', mint: '', attestation: '', escrow: '' };
+
+    try {
+      // 1. Burn on source chain
+      const burnRes = await initiateBurn(sourceChain.value, newJob.value.budget.toString(), userAddress.value);
+      bridgeTxHashes.value.burn = burnRes.burnTxHash;
+
+      // 2. Poll Attestation
+      bridgeStep.value = 2;
+      bridgeStatusText.value = 'Waiting for Circle attestation signature (this takes ~8 seconds in simulation/sandbox)...';
+      const attestationSig = await pollBridgeAttestation(burnRes.messageHash, (progressText) => {
+        bridgeStatusText.value = progressText;
+      });
+      bridgeTxHashes.value.attestation = attestationSig;
+
+      // 3. Mint on Arc Testnet (Gasless sponsored transaction)
+      bridgeStep.value = 3;
+      bridgeStatusText.value = 'Attestation verified! Submitting sponsored mint transaction on Arc Testnet...';
+      const mintTx = await mintOnArc(burnRes.messageBytes, attestationSig);
+      bridgeTxHashes.value.mint = mintTx;
+
+      // 4. Create Job / Deposit Escrow on Arc Testnet
+      bridgeStep.value = 4;
+      bridgeStatusText.value = 'Depositing USDC into smart contract escrow & launching job portal...';
+
+      let createTxHash = '';
+      if (circleUserWallet.value) {
+        const createRes = await executeSponsoredTransaction({
+          walletId: circleUserWallet.value.id,
+          contractAddress: contractAddress,
+          abiFunctionSignature: 'createJob(uint256,string,uint256[],string[])',
+          abiParameters: [
+            usdcUnits.toString(),
+            newJob.value.repoUrl,
+            milestoneBudgets.map(b => b.toString()),
+            milestoneTitles
+          ],
+          userToken: circleSessionToken.value,
+          userAddress: userAddress.value,
+          isSimulation: isSimulationMode.value,
+          executeChallengeFn: executeChallenge
+        });
+        createTxHash = createRes.txHash || 'Pending';
+      } else {
+        const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
+        const walletClient = createWalletClient({
+          account: userAddress.value,
+          chain: arcTestnet,
+          transport: custom(window.ethereum)
+        });
+        const createTx = await walletClient.writeContract({
+          address: contractAddress,
+          abi: GIGMARKET_ESCROW_ABI,
+          functionName: 'createJob',
+          args: [usdcUnits, newJob.value.repoUrl, milestoneBudgets, milestoneTitles]
+        });
+        await publicClient.waitForTransactionReceipt({ hash: createTx });
+        createTxHash = createTx;
+      }
+      bridgeTxHashes.value.escrow = createTxHash;
+
+      // Read new job ID
+      let jobIdVal = 1;
+      if (!isSimulationMode.value) {
+        const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
+        const jobCount = await publicClient.readContract({
+          address: contractAddress,
+          abi: GIGMARKET_ESCROW_ABI,
+          functionName: 'jobCount'
+        });
+        jobIdVal = parseInt(jobCount.toString());
+      } else {
+        jobIdVal = jobsList.value.length + 1;
+      }
+
+      // Save to database
+      const newJobDb = {
+        id: jobIdVal,
+        title: newJob.value.title,
+        description: newJob.value.description,
+        repoUrl: newJob.value.repoUrl,
+        budget: newJob.value.budget,
+        requiredStake: calculateJobRequiredStake(newJob.value.budget),
+        freelancerStake: '0',
+        client: userAddress.value,
+        freelancer: '0x0000000000000000000000000000000000000000',
+        status: 'Created',
+        currentMilestone: 0,
+        fundingMethod: 'cross-chain',
+        sourceChain: sourceChain.value,
+        burnTxHash: burnRes.burnTxHash,
+        mintTxHash: mintTx,
+        escrowTxHash: createTxHash,
+        milestones: newJob.value.milestones.map(m => ({
+          title: m.title,
+          budget: m.budget,
+          completed: false,
+          approved: false,
+          txHash: createTxHash
+        }))
+      };
+
+      await $fetch('/api/jobs', { method: 'POST', body: newJobDb });
+
+      bridgeStep.value = 5;
+      bridgeStatusText.value = 'Success! Escrow funded and gig is now active on GigMarket.';
+      await loadJobsFromLocalDb();
+      await fetchUserBlockchainDetails();
+
+      // Reset form
+      newJob.value.title = '';
+      newJob.value.description = '';
+      newJob.value.repoUrl = '';
+    } catch (e) {
+      console.error('CCTP Bridge error:', e);
+      bridgeStep.value = -1;
+      bridgeStatusText.value = `Bridge execution failed: ${e.message || e}`;
+    } finally {
+      isSubmitting.value = false;
+    }
+    return;
+  }
+
+  // --- STANDARD DIRECT ARC FLOW ---
   if (circleUserWallet.value) {
     isSubmitting.value = true;
     try {
-      // 1. Approve USDC transfer via Sponsored Transaction
       modals.loading('Authorizing USDC Budget', 'Step 1 of 2: Authorizing USDC budget allocation. Processing (Gasless Sponsored Transaction)...');
       const approveRes = await executeSponsoredTransaction({
         walletId: circleUserWallet.value.id,
@@ -1929,7 +2250,6 @@ async function createGig() {
       });
       const approveTxHash = approveRes.txHash || 'Pending';
       
-      // 2. Create Job via Sponsored Transaction
       closeModal();
       modals.loading('Funding Escrow Job', 'Step 2 of 2: Securing project budget in escrow. Processing (Gasless Sponsored Transaction)...');
       
@@ -1963,7 +2283,6 @@ async function createGig() {
         jobIdVal = jobsList.value.length + 1;
       }
       
-      // Post to db
       const newJobDb = {
         id: jobIdVal,
         title: newJob.value.title,
@@ -1976,6 +2295,7 @@ async function createGig() {
         freelancer: '0x0000000000000000000000000000000000000000',
         status: 'Created',
         currentMilestone: 0,
+        fundingMethod: 'arc',
         milestones: newJob.value.milestones.map(m => ({
           title: m.title,
           budget: m.budget,
@@ -2041,7 +2361,6 @@ async function createGig() {
     modals.txPending(createTx, 'Publishing job escrow and locking USDC gasless pools. Awaiting block receipt...');
     const receipt = await publicClient.waitForTransactionReceipt({ hash: createTx });
 
-    // Read emitted Job ID from events or fetch jobCount
     const jobCount = await publicClient.readContract({
       address: contractAddress,
       abi: GIGMARKET_ESCROW_ABI,
@@ -2049,7 +2368,6 @@ async function createGig() {
     });
     const jobIdVal = parseInt(jobCount.toString());
 
-    // 3. Post to backend JSON database to persist
     const newJobDb = {
       id: jobIdVal,
       title: newJob.value.title,
@@ -2062,6 +2380,7 @@ async function createGig() {
       freelancer: '0x0000000000000000000000000000000000000000',
       status: 'Created',
       currentMilestone: 0,
+      fundingMethod: 'arc',
       milestones: newJob.value.milestones.map(m => ({
         title: m.title,
         budget: m.budget,
