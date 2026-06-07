@@ -73,8 +73,119 @@ export async function executeEscrowApproval(jobId, milestoneIndex) {
   console.log(`Executing escrow approval for Job #${jobId}, Milestone ${milestoneIndex}. Mode: ${status.mode}`);
 
   const contractAddress = getContractAddress();
-  const abiFunctionSignature = 'approveMilestone(uint256,uint256)';
-  const abiParameters = [jobId.toString(), milestoneIndex.toString()];
+  
+  // Create public client to query the contract
+  const publicClient = createPublicClient({
+    chain: arcTestnet,
+    transport: http(),
+  });
+
+  // Read ABI from hardhat compilation artifacts
+  const artifactPath = path.resolve('./artifacts_contract/contracts/GigMarketEscrow.sol/GigMarketEscrow.json');
+  if (!fs.existsSync(artifactPath)) {
+    throw new Error('Contract JSON artifact not found. Please compile the contract first ("npm run compile").');
+  }
+
+  const contractJson = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
+  const abi = contractJson.abi;
+
+  // Determine preferred currency and slippage requirements
+  let payoutCurrency = 'USDC';
+  let minAmountEURC = 0n;
+
+  try {
+    const pref = await publicClient.readContract({
+      address: contractAddress,
+      abi,
+      functionName: 'jobPayoutCurrency',
+      args: [BigInt(jobId)],
+    });
+    if (pref) {
+      payoutCurrency = pref;
+    }
+  } catch (err) {
+    console.warn(`[StableFX] Could not fetch jobPayoutCurrency for Job #${jobId}, defaulting to USDC:`, err.message);
+  }
+
+  if (payoutCurrency === 'EURC') {
+    try {
+      console.log('[StableFX] EURC preference detected. Fetching job/milestone details for swap calculation...');
+      const job = await publicClient.readContract({
+        address: contractAddress,
+        abi,
+        functionName: 'jobs',
+        args: [BigInt(jobId)],
+      });
+
+      const milestone = await publicClient.readContract({
+        address: contractAddress,
+        abi,
+        functionName: 'jobMilestones',
+        args: [BigInt(jobId), BigInt(milestoneIndex)],
+      });
+
+      const milestoneBudget = BigInt(milestone[0]);
+      const jobBudget = BigInt(job[3]);
+      const jobRequiredStake = BigInt(job[5]);
+      const jobFreelancerStake = BigInt(job[4]);
+
+      const platformFee = milestoneBudget / 100n;
+      const freelancerPayout = milestoneBudget - platformFee;
+      let stakeReturn = 0n;
+      if (jobRequiredStake > 0n) {
+        stakeReturn = (jobRequiredStake * milestoneBudget) / jobBudget;
+        if (stakeReturn > jobFreelancerStake) {
+          stakeReturn = jobFreelancerStake;
+        }
+      }
+      const totalPayoutUSDC = freelancerPayout + stakeReturn;
+
+      // Fetch FX quote
+      let quoteRate = 0.92;
+      try {
+        const apiKey = process.env.CIRCLE_API_KEY;
+        if (apiKey && !apiKey.startsWith('TEST_API_KEY')) {
+          const isSandbox = apiKey.startsWith('SANDBOX') || apiKey.includes('test') || apiKey.includes('sandbox');
+          const baseUrl = isSandbox ? 'https://api-sandbox.circle.com' : 'https://api.circle.com';
+          const response = await $fetch(`${baseUrl}/v1/exchange/stablefx/quotes`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: {
+              from: {
+                currency: 'USDC',
+                amount: (Number(totalPayoutUSDC) / 1e6).toFixed(2)
+              },
+              to: {
+                currency: 'EURC'
+              }
+            }
+          });
+          if (response && response.price) {
+            quoteRate = parseFloat(response.price);
+          }
+        }
+      } catch (quoteErr) {
+        console.warn('[StableFX] Failed to fetch live FX quote, using fallback 0.92:', quoteErr.message);
+      }
+
+      const expectedEURC = Number(totalPayoutUSDC) * quoteRate;
+      minAmountEURC = BigInt(Math.floor(expectedEURC * 0.99)); // 1% slippage allowance
+      console.log(`[StableFX] Calculated swap: ${totalPayoutUSDC.toString()} USDC -> EURC. Min expected output: ${minAmountEURC.toString()}`);
+    } catch (calcErr) {
+      console.error('[StableFX] Failed to calculate EURC swap params, defaulting minAmountEURC to 0:', calcErr.message);
+    }
+  }
+
+  const isEurcSwap = payoutCurrency === 'EURC';
+  const abiFunctionSignature = isEurcSwap 
+    ? 'approveMilestoneWithSlippage(uint256,uint256,uint256)' 
+    : 'approveMilestone(uint256,uint256)';
+  const abiParameters = isEurcSwap 
+    ? [jobId.toString(), milestoneIndex.toString(), minAmountEURC.toString()] 
+    : [jobId.toString(), milestoneIndex.toString()];
 
   if (status.mode === 'CIRCLE_DCW') {
     // 1. CIRCLE DEVELOPER-CONTROLLED WALLET MODE
@@ -122,27 +233,23 @@ export async function executeEscrowApproval(jobId, milestoneIndex) {
       transport: http(),
     });
 
-    const publicClient = createPublicClient({
-      chain: arcTestnet,
-      transport: http(),
-    });
-
-    // Read ABI from hardhat compilation artifacts
-    const artifactPath = path.resolve('./artifacts_contract/contracts/GigMarketEscrow.sol/GigMarketEscrow.json');
-    if (!fs.existsSync(artifactPath)) {
-      throw new Error('Contract JSON artifact not found. Please compile the contract first ("npm run compile").');
-    }
-
-    const contractJson = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
-    const abi = contractJson.abi;
-
     try {
-      const hash = await walletClient.writeContract({
-        address: contractAddress,
-        abi,
-        functionName: 'approveMilestone',
-        args: [BigInt(jobId), BigInt(milestoneIndex)],
-      });
+      let hash;
+      if (isEurcSwap) {
+        hash = await walletClient.writeContract({
+          address: contractAddress,
+          abi,
+          functionName: 'approveMilestoneWithSlippage',
+          args: [BigInt(jobId), BigInt(milestoneIndex), minAmountEURC],
+        });
+      } else {
+        hash = await walletClient.writeContract({
+          address: contractAddress,
+          abi,
+          functionName: 'approveMilestone',
+          args: [BigInt(jobId), BigInt(milestoneIndex)],
+        });
+      }
 
       console.log(`Viem transaction sent: ${hash}`);
       console.log('Waiting for receipt...');
