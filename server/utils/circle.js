@@ -62,6 +62,8 @@ export function getCircleConfigStatus() {
     circleWalletId: process.env.CIRCLE_WALLET_ID,
     hasApiKey: !!process.env.CIRCLE_API_KEY,
     hasEntitySecret: !!process.env.CIRCLE_ENTITY_SECRET,
+    paymasterAddress: process.env.CIRCLE_PAYMASTER_ADDRESS || '0x0000000071727E5C77c03C68673752c289654e53',
+    paymasterPolicyId: process.env.CIRCLE_PAYMASTER_POLICY_ID || 'policy_eaacebab-81c3-47d5-a0b6-5721cdd7f2e8',
   };
 }
 
