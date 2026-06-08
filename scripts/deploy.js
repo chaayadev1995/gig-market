@@ -55,7 +55,18 @@ async function main() {
     transport: http(),
   });
 
-  // Read compiled contract artifact
+  // Read compiled contract artifact for MockUSYC
+  const mockUsycArtifactPath = path.resolve('./artifacts_contract/contracts/MockUSYC.sol/MockUSYC.json');
+  if (!fs.existsSync(mockUsycArtifactPath)) {
+    console.error('ERROR: MockUSYC JSON artifact not found. Please run "npm run compile" first.');
+    process.exit(1);
+  }
+
+  const mockUsycJson = JSON.parse(fs.readFileSync(mockUsycArtifactPath, 'utf8'));
+  const mockUsycAbi = mockUsycJson.abi;
+  const mockUsycBytecode = mockUsycJson.bytecode;
+
+  // Read compiled contract artifact for GigMarketEscrow
   const artifactPath = path.resolve('./artifacts_contract/contracts/GigMarketEscrow.sol/GigMarketEscrow.json');
   if (!fs.existsSync(artifactPath)) {
     console.error('ERROR: Contract JSON artifact not found. Please run "npm run compile" first.');
@@ -66,9 +77,20 @@ async function main() {
   const abi = contractJson.abi;
   const bytecode = contractJson.bytecode;
 
-  console.log('Deploying GigMarketEscrow contract on Arc Testnet...');
-  
   try {
+    console.log('Deploying MockUSYC contract on Arc Testnet...');
+    const usycHash = await walletClient.deployContract({
+      abi: mockUsycAbi,
+      bytecode: mockUsycBytecode,
+      args: [USDC_TOKEN_ADDRESS],
+    });
+    console.log(`MockUSYC Transaction hash: ${usycHash}`);
+    console.log('Waiting for MockUSYC transaction to be mined...');
+    const usycReceipt = await publicClient.waitForTransactionReceipt({ hash: usycHash });
+    const mockUsycAddress = usycReceipt.contractAddress;
+    console.log(`SUCCESS: MockUSYC deployed to: ${mockUsycAddress}`);
+
+    console.log('Deploying GigMarketEscrow contract on Arc Testnet...');
     const hash = await walletClient.deployContract({
       abi,
       bytecode,
@@ -82,6 +104,18 @@ async function main() {
     const contractAddress = receipt.contractAddress;
     
     console.log(`\nSUCCESS: GigMarketEscrow deployed to: ${contractAddress}`);
+
+    console.log('Setting USYC token address on GigMarketEscrow...');
+    const setUsycHash = await walletClient.writeContract({
+      address: contractAddress,
+      abi,
+      functionName: 'setUsycToken',
+      args: [mockUsycAddress],
+    });
+    console.log(`setUsycToken transaction hash: ${setUsycHash}`);
+    await publicClient.waitForTransactionReceipt({ hash: setUsycHash });
+    console.log('USYC token configured on escrow contract!');
+    
     console.log(`Explorer Link: https://testnet.arcscan.app/address/${contractAddress}`);
     
     // Save contract address to a JSON file so that backend and frontend can read it
@@ -91,9 +125,9 @@ async function main() {
     }
     fs.writeFileSync(
       path.join(addressesDir, 'contract-address.json'),
-      JSON.stringify({ GigMarketEscrow: contractAddress }, null, 2)
+      JSON.stringify({ GigMarketEscrow: contractAddress, MockUSYC: mockUsycAddress }, null, 2)
     );
-    console.log('Saved contract address to db/contract-address.json');
+    console.log('Saved contract addresses to db/contract-address.json');
   } catch (error) {
     console.error('Deployment failed:', error);
     process.exit(1);

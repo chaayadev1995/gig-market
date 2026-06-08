@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { readBody, getMethod, defineEventHandler } from 'h3';
+import { getContractAddress, arcTestnet } from '../utils/circle';
+import { createPublicClient, http } from 'viem';
 
 const JOBS_DB_PATH = path.resolve('./db/jobs.json');
 
@@ -31,7 +33,78 @@ export default defineEventHandler(async (event) => {
   const method = getMethod(event);
 
   if (method === 'GET') {
-    return readJobs();
+    const jobs = readJobs();
+    const contractAddress = getContractAddress();
+    
+    // Fetch ABI
+    const artifactPath = path.resolve('./artifacts_contract/contracts/GigMarketEscrow.sol/GigMarketEscrow.json');
+    let abi = [];
+    if (fs.existsSync(artifactPath)) {
+      try {
+        const contractJson = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
+        abi = contractJson.abi;
+      } catch (e) {
+        console.error('Error reading ABI:', e);
+      }
+    }
+
+    if (abi.length > 0 && contractAddress) {
+      try {
+        const publicClient = createPublicClient({
+          chain: arcTestnet,
+          transport: http(),
+        });
+
+        const enrichedJobs = [];
+        for (const job of jobs) {
+          try {
+            const onChainJob = await publicClient.readContract({
+              address: contractAddress,
+              abi,
+              functionName: 'jobs',
+              args: [BigInt(job.id)],
+            });
+            
+            const statusMap = ['Created', 'Active', 'Disputed', 'Resolved', 'Completed'];
+            job.status = statusMap[Number(onChainJob[6])];
+            job.freelancer = onChainJob[2];
+            job.freelancerStake = Number(onChainJob[4]) / 1e6;
+            job.requiredStake = Number(onChainJob[5]) / 1e6;
+            job.currentMilestone = Number(onChainJob[10]);
+            job.accumulatedYield = Number(onChainJob[11]) / 1e6;
+            job.yieldDistributed = Number(onChainJob[12]) / 1e6;
+
+            // Fetch live yield
+            try {
+              const liveYield = await publicClient.readContract({
+                address: contractAddress,
+                abi,
+                functionName: 'calculateAccruedYield',
+                args: [BigInt(job.id)],
+              });
+              job.liveAccruedYield = Number(liveYield) / 1e6;
+            } catch (yieldErr) {
+              job.liveAccruedYield = 0;
+            }
+          } catch (onChainError) {
+            if (job.accumulatedYield === undefined) job.accumulatedYield = 0;
+            if (job.yieldDistributed === undefined) job.yieldDistributed = 0;
+            if (job.liveAccruedYield === undefined) job.liveAccruedYield = 0;
+          }
+          enrichedJobs.push(job);
+        }
+        return enrichedJobs;
+      } catch (err) {
+        console.error('Error enriching jobs from contract:', err);
+      }
+    }
+
+    return jobs.map(job => {
+      if (job.accumulatedYield === undefined) job.accumulatedYield = 0;
+      if (job.yieldDistributed === undefined) job.yieldDistributed = 0;
+      if (job.liveAccruedYield === undefined) job.liveAccruedYield = 0;
+      return job;
+    });
   }
 
   if (method === 'POST') {
