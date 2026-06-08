@@ -358,76 +358,142 @@
             </form>
           </div>
 
-          <!-- Right: Posted Gigs List -->
+          <!-- Right: Posted Gigs List with Yield Tabs -->
           <div class="glass-panel">
-            <h3 style="margin-bottom: 20px; color: var(--text-primary);">Your Posted Gigs</h3>
-            <div v-if="loadingJobs" class="shimmer-bg" style="height: 200px; border-radius: var(--border-radius-md);"></div>
-            <div v-else-if="clientJobs.length === 0" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-              No jobs posted yet. Create your first freelance gig on Arc Testnet!
+            <div class="tabs-header" style="border-bottom: none; margin-bottom: 20px;">
+              <button class="tab-btn" :class="{ active: clientSubTab === 'gigs' }" @click="clientSubTab = 'gigs'">Your Posted Gigs</button>
+              <button class="tab-btn" :class="{ active: clientSubTab === 'yield' }" @click="clientSubTab = 'yield'">🛡 Yield Vault</button>
             </div>
-            <div v-else class="gigs-grid" style="grid-template-columns: 1fr;">
-              <div v-for="job in clientJobs" :key="job.id" class="glass-panel" style="background: var(--bg-primary); border: 2px solid var(--border-color); box-shadow: 2px 2px 0px var(--border-color);">
-                <div class="gig-card-header">
-                  <div>
-                    <h4 class="gig-title">{{ job.title }}</h4>
-                    <span style="font-size: 12px; color: var(--text-secondary); font-family: monospace;">Job ID: #{{ job.id }} | Repo: {{ job.repoUrl }}</span>
-                  </div>
-                  <span class="badge" :class="'badge-' + job.status.toLowerCase()">{{ job.status }}</span>
-                </div>
-                <p class="gig-desc">{{ job.description }}</p>
-                <div class="gig-meta">
-                  <div class="gig-meta-item">
-                    <span class="gig-meta-label">Total Budget</span>
-                    <span class="gig-meta-value">{{ job.budget }} USDC</span>
-                  </div>
-                  <div class="gig-meta-item">
-                    <span class="gig-meta-label">Freelancer</span>
-                    <span class="gig-meta-value">{{ job.freelancer === '0x0000000000000000000000000000000000000000' ? 'Open for bids' : shortAddress(job.freelancer) }}</span>
-                  </div>
-                  <div class="gig-meta-item">
-                    <span class="gig-meta-label">Required Stake</span>
-                    <span class="gig-meta-value">{{ job.requiredStake }} USDC</span>
-                  </div>
-                </div>
 
-                <!-- CCTP Bridged Escrow Details -->
-                <div v-if="job.fundingMethod === 'cross-chain'" style="margin-top: 15px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-family: monospace; background: var(--accent-teal-light); border: 2.5px solid var(--border-color); padding: 10px; border-radius: var(--border-radius-sm);">
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: 700; color: var(--accent-teal-dark);">🔀 CCTP Bridged (from {{ job.sourceChain ? job.sourceChain.replace('_', ' ') : 'Base Sepolia' }})</span>
-                    <span v-if="job.bridgeVerified" style="color: var(--accent-green); font-weight: 700;">✓ Verified</span>
-                    <span v-else style="color: var(--accent-orange); font-weight: 700;">⚠ Verification Pending</span>
+            <div v-if="clientSubTab === 'gigs'">
+              <div v-if="loadingJobs" class="shimmer-bg" style="height: 200px; border-radius: var(--border-radius-md);"></div>
+              <div v-else-if="clientJobs.length === 0" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                No jobs posted yet. Create your first freelance gig on Arc Testnet!
+              </div>
+              <div v-else class="gigs-grid" style="grid-template-columns: 1fr;">
+                <div v-for="job in clientJobs" :key="job.id" class="glass-panel" style="background: var(--bg-primary); border: 2px solid var(--border-color); box-shadow: 2px 2px 0px var(--border-color);">
+                  <div class="gig-card-header">
+                    <div>
+                      <h4 class="gig-title">{{ job.title }}</h4>
+                      <span style="font-size: 12px; color: var(--text-secondary); font-family: monospace;">Job ID: #{{ job.id }} | Repo: {{ job.repoUrl }}</span>
+                    </div>
+                    <span class="badge" :class="'badge-' + job.status.toLowerCase()">{{ job.status }}</span>
                   </div>
-                  <div style="display: flex; gap: 12px; margin-top: 4px;">
-                    <a v-if="job.burnTxHash" :href="getTxExplorerUrl(job.sourceChain, job.burnTxHash)" target="_blank" style="color: var(--text-primary); text-decoration: underline; font-weight: 700;">Burn Tx ↗</a>
-                    <a v-if="job.mintTxHash" :href="getTxExplorerUrl('Arc_Testnet', job.mintTxHash)" target="_blank" style="color: var(--text-primary); text-decoration: underline; font-weight: 700;">Mint Tx ↗</a>
-                  </div>
-                </div>
-
-                <!-- Milestones checklist -->
-                <div style="margin-top: 15px;">
-                  <h5 style="font-size: 13px; margin-bottom: 8px; color: var(--accent-teal-dark);">Milestones Details</h5>
-                  <div v-for="(m, idx) in job.milestones" :key="idx" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg-secondary); border: 1.5px solid var(--border-color); margin-bottom: 6px; border-radius: 8px;">
-                    <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                      <span style="font-size: 14px; font-weight: 600;">{{ idx + 1 }}. {{ m.title }}</span>
-                      <span style="font-size: 12px; color: var(--text-secondary);">
-                        Budget: {{ m.budget }} USDC
-                        <span v-if="job.payoutCurrency === 'EURC'" style="color: var(--accent-purple); font-weight: 700;">
-                          (Est. {{ (m.budget * liveQuoteRate).toFixed(2) }} EURC)
+                  <p class="gig-desc">{{ job.description }}</p>
+                  <div class="gig-meta">
+                    <div class="gig-meta-item">
+                      <span class="gig-meta-label">Total Budget</span>
+                      <span class="gig-meta-value">{{ job.budget }} USDC</span>
+                    </div>
+                    <div class="gig-meta-item">
+                      <span class="gig-meta-label">Yield Generated</span>
+                      <span class="gig-meta-value" style="color: var(--accent-green); font-weight: 700;">
+                        +{{ (job.accumulatedYield || 0).toFixed(4) }} USDC
+                        <span v-if="job.liveAccruedYield" style="font-size: 11px; font-style: italic; color: var(--accent-teal); font-weight: 500;">
+                          (Live: +{{ job.liveAccruedYield.toFixed(4) }})
                         </span>
                       </span>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                      <span v-if="m.approved" class="badge badge-completed" style="font-size: 10px; padding: 2px 8px;">Paid</span>
-                      <button v-else-if="job.status === 'Active' && job.currentMilestone == idx" class="btn btn-primary btn-small" style="padding: 4px 10px; border-radius: 6px;" @click="payoutMilestone(job.id, idx)">
-                        Release Payout
-                      </button>
-                      <span v-else style="font-size: 12px; color: var(--text-secondary);">Locked</span>
+                    <div class="gig-meta-item">
+                      <span class="gig-meta-label">Required Stake</span>
+                      <span class="gig-meta-value">{{ job.requiredStake }} USDC</span>
+                    </div>
+                  </div>
+
+                  <!-- CCTP Bridged Escrow Details -->
+                  <div v-if="job.fundingMethod === 'cross-chain'" style="margin-top: 15px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-family: monospace; background: var(--accent-teal-light); border: 2.5px solid var(--border-color); padding: 10px; border-radius: var(--border-radius-sm);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-weight: 700; color: var(--accent-teal-dark);">🔀 CCTP Bridged (from {{ job.sourceChain ? job.sourceChain.replace('_', ' ') : 'Base Sepolia' }})</span>
+                      <span v-if="job.bridgeVerified" style="color: var(--accent-green); font-weight: 700;">✓ Verified</span>
+                      <span v-else style="color: var(--accent-orange); font-weight: 700;">⚠ Verification Pending</span>
+                    </div>
+                    <div style="display: flex; gap: 12px; margin-top: 4px;">
+                      <a v-if="job.burnTxHash" :href="getTxExplorerUrl(job.sourceChain, job.burnTxHash)" target="_blank" style="color: var(--text-primary); text-decoration: underline; font-weight: 700;">Burn Tx ↗</a>
+                      <a v-if="job.mintTxHash" :href="getTxExplorerUrl('Arc_Testnet', job.mintTxHash)" target="_blank" style="color: var(--text-primary); text-decoration: underline; font-weight: 700;">Mint Tx ↗</a>
+                    </div>
+                  </div>
+
+                  <!-- Milestones checklist -->
+                  <div style="margin-top: 15px;">
+                    <h5 style="font-size: 13px; margin-bottom: 8px; color: var(--accent-teal-dark);">Milestones Details</h5>
+                    <div v-for="(m, idx) in job.milestones" :key="idx" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg-secondary); border: 1.5px solid var(--border-color); margin-bottom: 6px; border-radius: 8px;">
+                      <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                        <span style="font-size: 14px; font-weight: 600;">{{ idx + 1 }}. {{ m.title }}</span>
+                        <span style="font-size: 12px; color: var(--text-secondary);">
+                          Budget: {{ m.budget }} USDC
+                          <span v-if="job.payoutCurrency === 'EURC'" style="color: var(--accent-purple); font-weight: 700;">
+                            (Est. {{ (m.budget * liveQuoteRate).toFixed(2) }} EURC)
+                          </span>
+                        </span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span v-if="m.approved" class="badge badge-completed" style="font-size: 10px; padding: 2px 8px;">Paid</span>
+                        <button v-else-if="job.status === 'Active' && job.currentMilestone == idx" class="btn btn-primary btn-small" style="padding: 4px 10px; border-radius: 6px;" @click="payoutMilestone(job.id, idx)">
+                          Release Payout
+                        </button>
+                        <span v-else style="font-size: 12px; color: var(--text-secondary);">Locked</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-if="job.status === 'Active'" style="margin-top: 15px; display: flex; justify-content: flex-end;">
+                    <button class="btn btn-danger btn-small" @click="raiseDispute(job.id)">Raise Dispute</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SubTab: Yield Vault (Client) -->
+            <div v-if="clientSubTab === 'yield'">
+              <div class="glass-panel" style="background: var(--bg-secondary); border: 2.5px solid var(--border-color); border-radius: var(--border-radius-md); padding: 20px; margin-bottom: 20px;">
+                <h4 style="color: var(--accent-teal-dark); margin-bottom: 12px; font-size: 16px;">🌾 Client Escrow Yield Vault</h4>
+                <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 16px;">
+                  Your funded escrows are wrapped in <strong>USYC</strong> tokens to generate interest. Upon milestone releases or resolution, accrued interest is split: <strong>30% Client Cash-back</strong>, <strong>50% Freelancer Incentive</strong>, and <strong>20% Platform Fee</strong>.
+                </p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                  <div style="background: var(--bg-primary); border: 2px solid var(--border-color); padding: 16px; border-radius: 8px; box-shadow: 2px 2px 0px var(--border-color);">
+                    <div style="font-size: 12px; color: var(--text-secondary);">Your Cash-Back Received</div>
+                    <div style="font-size: 24px; font-weight: 800; color: var(--accent-green); margin-top: 6px;">
+                      +{{ totalClientYieldReceived.toFixed(4) }} USDC
+                    </div>
+                  </div>
+                  <div style="background: var(--bg-primary); border: 2px solid var(--border-color); padding: 16px; border-radius: 8px; box-shadow: 2px 2px 0px var(--border-color);">
+                    <div style="font-size: 12px; color: var(--text-secondary);">Your Pending Cash-Back (Live)</div>
+                    <div style="font-size: 24px; font-weight: 800; color: var(--accent-teal); margin-top: 6px;">
+                      +{{ totalClientYieldAccruing.toFixed(4) }} USDC
+                    </div>
+                  </div>
+                  <div style="background: var(--bg-primary); border: 2px solid var(--border-color); padding: 16px; border-radius: 8px; box-shadow: 2px 2px 0px var(--border-color); grid-column: span 2; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                      <div style="font-size: 12px; color: var(--text-secondary);">Platform Treasury Yield Collected</div>
+                      <div style="font-size: 20px; font-weight: 800; color: var(--accent-purple); margin-top: 4px;">
+                        +{{ totalPlatformYieldRevenue.toFixed(4) }} USDC
+                      </div>
+                    </div>
+                    <div style="text-align: right;">
+                      <div style="font-size: 12px; color: var(--text-secondary);">Live Pending Platform Treasury</div>
+                      <div style="font-size: 15px; font-weight: 700; color: var(--text-secondary); margin-top: 4px;">
+                        +{{ (jobsList.reduce((sum, j) => sum + (j.liveAccruedYield || 0) * 0.2, 0)).toFixed(4) }} USDC
+                      </div>
                     </div>
                   </div>
                 </div>
+              </div>
 
-                <div v-if="job.status === 'Active'" style="margin-top: 15px; display: flex; justify-content: flex-end;">
-                  <button class="btn btn-danger btn-small" @click="raiseDispute(job.id)">Raise Dispute</button>
+              <h4 style="font-size: 15px; margin-bottom: 12px; color: var(--text-primary);">Your Gigs Yield Activity</h4>
+              <div v-if="clientJobs.length === 0" style="text-align: center; padding: 20px; color: var(--text-secondary);">
+                No posted gigs generating yield.
+              </div>
+              <div class="gigs-grid" style="grid-template-columns: 1fr; gap: 12px;">
+                <div v-for="job in clientJobs" :key="job.id" class="glass-panel" style="background: var(--bg-primary); border: 2.5px solid var(--border-color); padding: 15px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 700;">{{ job.title }}</span>
+                    <span class="badge" :class="'badge-' + job.status.toLowerCase()">{{ job.status }}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; font-size: 13px; margin-top: 10px; color: var(--text-secondary);">
+                    <span>Accrued Yield: <strong style="color: var(--accent-green);">+{{ (job.accumulatedYield || 0).toFixed(4) }} USDC</strong></span>
+                    <span>Live Accruing: <strong style="color: var(--accent-teal);">+{{ (job.liveAccruedYield || 0).toFixed(4) }} USDC</strong></span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -471,6 +537,7 @@
             <div class="tabs-header" style="border-bottom: none; margin-bottom: 20px;">
               <button class="tab-btn" :class="{ active: freelancerSubTab === 'browse' }" @click="freelancerSubTab = 'browse'">Browse Gigs</button>
               <button class="tab-btn" :class="{ active: freelancerSubTab === 'mygigs' }" @click="freelancerSubTab = 'mygigs'">My Joined Gigs</button>
+              <button class="tab-btn" :class="{ active: freelancerSubTab === 'yield' }" @click="freelancerSubTab = 'yield'">🛡 Yield Vault</button>
             </div>
 
             <!-- SubTab: Browse Open Gigs -->
@@ -496,6 +563,15 @@
                         {{ job.budget }} USDC
                         <span style="font-size: 11px; color: var(--accent-purple); font-weight: 700;">
                           (Est. {{ (job.budget * liveQuoteRate).toFixed(2) }} EURC)
+                        </span>
+                      </span>
+                    </div>
+                    <div class="gig-meta-item">
+                      <span class="gig-meta-label">Yield Generated</span>
+                      <span class="gig-meta-value" style="color: var(--accent-green); font-weight: 700;">
+                        +{{ (job.accumulatedYield || 0).toFixed(4) }} USDC
+                        <span v-if="job.liveAccruedYield" style="font-size: 11px; font-style: italic; color: var(--accent-teal); font-weight: 500;">
+                          (Live: +{{ job.liveAccruedYield.toFixed(4) }})
                         </span>
                       </span>
                     </div>
@@ -551,6 +627,15 @@
                     <div class="gig-meta-item">
                       <span class="gig-meta-label">Project Budget</span>
                       <span class="gig-meta-value">{{ job.budget }} USDC</span>
+                    </div>
+                    <div class="gig-meta-item">
+                      <span class="gig-meta-label">Yield Generated</span>
+                      <span class="gig-meta-value" style="color: var(--accent-green); font-weight: 700;">
+                        +{{ (job.accumulatedYield || 0).toFixed(4) }} USDC
+                        <span v-if="job.liveAccruedYield" style="font-size: 11px; font-style: italic; color: var(--accent-teal); font-weight: 500;">
+                          (Live: +{{ job.liveAccruedYield.toFixed(4) }})
+                        </span>
+                      </span>
                     </div>
                     <div class="gig-meta-item">
                       <span class="gig-meta-label">Your Stake Balance</span>
@@ -611,6 +696,61 @@
 
                   <div v-if="job.status === 'Active'" style="margin-top: 15px; display: flex; justify-content: flex-end;">
                     <button class="btn btn-danger btn-small" @click="raiseDispute(job.id)">Raise Dispute</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SubTab: Yield Vault (Freelancer) -->
+            <div v-if="freelancerSubTab === 'yield'">
+              <div class="glass-panel" style="background: var(--bg-secondary); border: 2.5px solid var(--border-color); border-radius: var(--border-radius-md); padding: 20px; margin-bottom: 20px;">
+                <h4 style="color: var(--accent-teal-dark); margin-bottom: 12px; font-size: 16px;">🌾 Freelancer Escrow Yield Vault</h4>
+                <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 16px;">
+                  Active escrows are programmatically wrapped in <strong>USYC (USD Yield Coin)</strong>, earning passive interest. Upon milestone payout, accrued yield is distributed: <strong>50% to Freelancer</strong>, <strong>30% to Client</strong>, and <strong>20% to the Platform</strong>.
+                </p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                  <div style="background: var(--bg-primary); border: 2px solid var(--border-color); padding: 16px; border-radius: 8px; box-shadow: 2px 2px 0px var(--border-color);">
+                    <div style="font-size: 12px; color: var(--text-secondary);">Your Distributed Yield</div>
+                    <div style="font-size: 24px; font-weight: 800; color: var(--accent-green); margin-top: 6px;">
+                      +{{ totalFreelancerYieldDistributed.toFixed(4) }} USDC
+                    </div>
+                  </div>
+                  <div style="background: var(--bg-primary); border: 2px solid var(--border-color); padding: 16px; border-radius: 8px; box-shadow: 2px 2px 0px var(--border-color);">
+                    <div style="font-size: 12px; color: var(--text-secondary);">Your Pending Accruing Yield (Live)</div>
+                    <div style="font-size: 24px; font-weight: 800; color: var(--accent-teal); margin-top: 6px;">
+                      +{{ totalFreelancerYieldAccruing.toFixed(4) }} USDC
+                    </div>
+                  </div>
+                  <div style="background: var(--bg-primary); border: 2px solid var(--border-color); padding: 16px; border-radius: 8px; box-shadow: 2px 2px 0px var(--border-color); grid-column: span 2; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                      <div style="font-size: 12px; color: var(--text-secondary);">Platform Treasury Yield Collected</div>
+                      <div style="font-size: 20px; font-weight: 800; color: var(--accent-purple); margin-top: 4px;">
+                        +{{ totalPlatformYieldRevenue.toFixed(4) }} USDC
+                      </div>
+                    </div>
+                    <div style="text-align: right;">
+                      <div style="font-size: 12px; color: var(--text-secondary);">Live Pending Platform Treasury</div>
+                      <div style="font-size: 15px; font-weight: 700; color: var(--text-secondary); margin-top: 4px;">
+                        +{{ (jobsList.reduce((sum, j) => sum + (j.liveAccruedYield || 0) * 0.2, 0)).toFixed(4) }} USDC
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <h4 style="font-size: 15px; margin-bottom: 12px; color: var(--text-primary);">Your Gigs Yield Activity</h4>
+              <div v-if="joinedJobs.length === 0" style="text-align: center; padding: 20px; color: var(--text-secondary);">
+                No active gigs generating yield.
+              </div>
+              <div v-else class="gigs-grid" style="grid-template-columns: 1fr; gap: 12px;">
+                <div v-for="job in joinedJobs" :key="job.id" class="glass-panel" style="background: var(--bg-primary); border: 2.5px solid var(--border-color); padding: 15px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 700;">{{ job.title }}</span>
+                    <span class="badge" :class="'badge-' + job.status.toLowerCase()">{{ job.status }}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; font-size: 13px; margin-top: 10px; color: var(--text-secondary);">
+                    <span>Accrued Yield: <strong style="color: var(--accent-green);">+{{ (job.accumulatedYield || 0).toFixed(4) }} USDC</strong></span>
+                    <span>Live Accruing: <strong style="color: var(--accent-teal);">+{{ (job.liveAccruedYield || 0).toFixed(4) }} USDC</strong></span>
                   </div>
                 </div>
               </div>
@@ -1611,6 +1751,35 @@ const isInitializingWallet = ref(false);
 
 const currentTab = ref('client');
 const freelancerSubTab = ref('browse');
+const clientSubTab = ref('gigs');
+
+const totalFreelancerYieldDistributed = computed(() => {
+  return jobsList.value
+    .filter(j => j.freelancer?.toLowerCase() === userAddress.value?.toLowerCase())
+    .reduce((sum, j) => sum + (j.yieldDistributed || 0) * 0.5, 0);
+});
+
+const totalFreelancerYieldAccruing = computed(() => {
+  return jobsList.value
+    .filter(j => j.freelancer?.toLowerCase() === userAddress.value?.toLowerCase() && (j.status === 'Active' || j.status === 'Disputed'))
+    .reduce((sum, j) => sum + (j.liveAccruedYield || 0) * 0.5, 0);
+});
+
+const totalClientYieldReceived = computed(() => {
+  return jobsList.value
+    .filter(j => j.client?.toLowerCase() === userAddress.value?.toLowerCase())
+    .reduce((sum, j) => sum + (j.yieldDistributed || 0) * 0.3, 0);
+});
+
+const totalClientYieldAccruing = computed(() => {
+  return jobsList.value
+    .filter(j => j.client?.toLowerCase() === userAddress.value?.toLowerCase() && (j.status === 'Active' || j.status === 'Disputed'))
+    .reduce((sum, j) => sum + (j.liveAccruedYield || 0) * 0.3, 0);
+});
+
+const totalPlatformYieldRevenue = computed(() => {
+  return jobsList.value.reduce((sum, j) => sum + (j.yieldDistributed || 0) * 0.2, 0);
+});
 
 // MVP Startup Page Architecture
 const activeSection = ref('home');
