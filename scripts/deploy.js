@@ -115,6 +115,19 @@ async function main() {
     console.log(`setUsycToken transaction hash: ${setUsycHash}`);
     await publicClient.waitForTransactionReceipt({ hash: setUsycHash });
     console.log('USYC token configured on escrow contract!');
+
+    // Configure Platform Treasury
+    const platformTreasury = process.env.TREASURY_ADDRESS || account.address;
+    console.log(`Setting treasury address on GigMarketEscrow to: ${platformTreasury}...`);
+    const setTreasuryHash = await walletClient.writeContract({
+      address: contractAddress,
+      abi,
+      functionName: 'setTreasury',
+      args: [platformTreasury],
+    });
+    console.log(`setTreasury transaction hash: ${setTreasuryHash}`);
+    await publicClient.waitForTransactionReceipt({ hash: setTreasuryHash });
+    console.log('Treasury address successfully configured on escrow contract!');
     
     console.log(`Explorer Link: https://testnet.arcscan.app/address/${contractAddress}`);
     

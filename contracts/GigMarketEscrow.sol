@@ -135,6 +135,13 @@ contract GigMarketEscrow {
     mapping(uint256 => mapping(uint8 => uint256)) public disputeVoteCounts;
     mapping(uint256 => bool) public disputeResolved;
 
+    address public treasury;
+    mapping(uint256 => address[]) public jobRecipients;
+    mapping(uint256 => uint256[]) public jobSplits;
+
+    event JobSplitsUpdated(uint256 indexed jobId, address[] recipients, uint256[] splits);
+    event PlatformFeeRouted(uint256 indexed jobId, address indexed treasury, uint256 amount);
+
     event JobCreated(uint256 indexed jobId, address indexed client, uint256 budget, string repoUrl);
     event JobJoined(uint256 indexed jobId, address indexed freelancer, uint256 stakedCollateral);
     event MilestoneCompleted(uint256 indexed jobId, uint256 milestoneIndex, uint256 amount);
@@ -176,6 +183,81 @@ contract GigMarketEscrow {
 
     function setUsycToken(address _usycToken) external onlyOwner {
         usycToken = IUSYC(_usycToken);
+    }
+
+    function setTreasury(address _treasury) external onlyOwner {
+        treasury = _treasury;
+    }
+
+    function withdrawFees(address to, uint256 amount) external onlyOwner {
+        require(amount <= platformFeesAccumulated, "Insufficient accumulated fees");
+        platformFeesAccumulated -= amount;
+        require(usdcToken.transfer(to, amount), "Fee transfer failed");
+    }
+
+    function setJobSplits(
+        uint256 jobId,
+        address[] calldata recipients,
+        uint256[] calldata splits
+    ) public {
+        Job storage job = jobs[jobId];
+        require(msg.sender == job.client || msg.sender == job.freelancer || msg.sender == owner, "Unauthorized to set splits");
+        require(job.status == JobStatus.Created || job.status == JobStatus.Active, "Invalid job status for splits");
+        require(recipients.length == splits.length, "Mismatched arrays");
+        require(recipients.length > 0, "Empty recipients list");
+        
+        uint256 totalSplit = 0;
+        for (uint256 i = 0; i < splits.length; i++) {
+            require(recipients[i] != address(0), "Invalid recipient address");
+            totalSplit += splits[i];
+        }
+        require(totalSplit == 100, "Total split must equal 100%");
+        
+        jobRecipients[jobId] = recipients;
+        jobSplits[jobId] = splits;
+
+        emit JobSplitsUpdated(jobId, recipients, splits);
+    }
+
+    function getJobSplits(uint256 jobId) external view returns (address[] memory, uint256[] memory) {
+        return (jobRecipients[jobId], jobSplits[jobId]);
+    }
+
+    function joinJobWithSplits(
+        uint256 jobId,
+        address[] calldata recipients,
+        uint256[] calldata splits
+    ) external {
+        joinJob(jobId);
+        setJobSplits(jobId, recipients, splits);
+    }
+
+    function createJobWithSplits(
+        uint256 budget,
+        string calldata repoUrl,
+        uint256[] calldata milestoneBudgets,
+        string[] calldata milestoneTitles,
+        address[] calldata recipients,
+        uint256[] calldata splits
+    ) external returns (uint256) {
+        uint256 jobId = createJob(budget, repoUrl, milestoneBudgets, milestoneTitles);
+        
+        require(recipients.length == splits.length, "Mismatched arrays");
+        require(recipients.length > 0, "Empty recipients list");
+        
+        uint256 totalSplit = 0;
+        for (uint256 i = 0; i < splits.length; i++) {
+            require(recipients[i] != address(0), "Invalid recipient address");
+            totalSplit += splits[i];
+        }
+        require(totalSplit == 100, "Total split must equal 100%");
+        
+        jobRecipients[jobId] = recipients;
+        jobSplits[jobId] = splits;
+
+        emit JobSplitsUpdated(jobId, recipients, splits);
+        
+        return jobId;
     }
 
     function calculateAccruedYield(uint256 jobId) public view returns (uint256) {
@@ -239,7 +321,7 @@ contract GigMarketEscrow {
         string calldata repoUrl,
         uint256[] calldata milestoneBudgets,
         string[] calldata milestoneTitles
-    ) external returns (uint256) {
+    ) public returns (uint256) {
         require(budget > 0, "Budget must be > 0");
         require(milestoneBudgets.length == milestoneTitles.length, "Mismatched milestones");
         
@@ -293,7 +375,7 @@ contract GigMarketEscrow {
         return jobId;
     }
 
-    function joinJob(uint256 jobId) external {
+    function joinJob(uint256 jobId) public {
         Job storage job = jobs[jobId];
         require(job.status == JobStatus.Created, "Job not open");
         require(job.freelancer == address(0), "Job already joined");
@@ -351,7 +433,6 @@ contract GigMarketEscrow {
         // 1. Calculate 1% Platform Take Rate fee
         uint256 platformFee = payout / 100;
         uint256 freelancerPayout = payout - platformFee;
-        platformFeesAccumulated += platformFee;
 
         // 2. Proportional Freelancer Stake return
         uint256 stakeReturn = 0;
@@ -365,8 +446,8 @@ contract GigMarketEscrow {
 
         job.currentMilestone++;
         
-        // Payout to Freelancer: Milestone earnings + Staked Collateral return (principal)
-        uint256 totalPayoutUSDC = freelancerPayout + stakeReturn;
+        // Payout: Milestone budget + Staked Collateral return (principal)
+        uint256 totalPayoutUSDC = payout + stakeReturn;
 
         // Redeem from USYC if configured
         uint256 usdcReceived = totalPayoutUSDC;
@@ -406,7 +487,13 @@ contract GigMarketEscrow {
             clientYield = (yieldAccrued * 30) / 100;
             platformYield = yieldAccrued - freelancerYield - clientYield;
             
-            platformFeesAccumulated += platformYield;
+            if (treasury != address(0) && platformYield > 0) {
+                require(usdcToken.transfer(treasury, platformYield), "Platform yield transfer failed");
+                emit PlatformFeeRouted(jobId, treasury, platformYield);
+            } else {
+                platformFeesAccumulated += platformYield;
+            }
+            
             job.accumulatedYield += yieldAccrued;
             job.yieldDistributed += yieldAccrued;
             
@@ -421,29 +508,88 @@ contract GigMarketEscrow {
             reputation[job.freelancer] += 1;
         }
 
-        // Payout to Freelancer: principal + 50% yield
-        uint256 totalFreelancerPayout = totalPayoutUSDC + freelancerYield;
+        // Payout platform fee to treasury
+        if (platformFee > 0) {
+            if (treasury != address(0)) {
+                require(usdcToken.transfer(treasury, platformFee), "Platform fee transfer failed");
+                emit PlatformFeeRouted(jobId, treasury, platformFee);
+            } else {
+                platformFeesAccumulated += platformFee;
+            }
+        }
 
-        if (keccak256(abi.encodePacked(jobPayoutCurrency[jobId])) == keccak256(abi.encodePacked("EURC")) && stableFXRouter != address(0)) {
-            // Approve router to spend USDC
-            usdcToken.approve(stableFXRouter, totalFreelancerPayout);
-            
-            // Execute swap via stableFXRouter
-            uint256 amountOut = IStableFXRouter(stableFXRouter).swap(
-                address(usdcToken),
-                address(eurcToken),
-                totalFreelancerPayout,
-                minAmountEURC,
-                job.freelancer
-            );
-            
-            require(amountOut >= minAmountEURC, "Slippage limit exceeded");
+        // Payout: split among recipients if configured, otherwise pay single freelancer
+        uint256 totalFreelancerPayout = totalPayoutUSDC - platformFee + freelancerYield;
+
+        uint256 recipientsCount = jobRecipients[jobId].length;
+        if (recipientsCount == 0) {
+            if (keccak256(abi.encodePacked(jobPayoutCurrency[jobId])) == keccak256(abi.encodePacked("EURC")) && stableFXRouter != address(0)) {
+                // Approve router to spend USDC
+                usdcToken.approve(stableFXRouter, totalFreelancerPayout);
+                
+                // Execute swap via stableFXRouter
+                uint256 amountOut = IStableFXRouter(stableFXRouter).swap(
+                    address(usdcToken),
+                    address(eurcToken),
+                    totalFreelancerPayout,
+                    minAmountEURC,
+                    job.freelancer
+                );
+                
+                require(amountOut >= minAmountEURC, "Slippage limit exceeded");
+            } else {
+                // Transfer USDC directly
+                require(
+                    usdcToken.transfer(job.freelancer, totalFreelancerPayout),
+                    "Payout transfer failed"
+                );
+            }
         } else {
-            // Transfer USDC directly
-            require(
-                usdcToken.transfer(job.freelancer, totalFreelancerPayout),
-                "Payout transfer failed"
-            );
+            // Multi-party split payout
+            // First, return the stake to the lead freelancer if any
+            if (stakeReturn > 0) {
+                require(usdcToken.transfer(job.freelancer, stakeReturn), "Stake return failed");
+            }
+            
+            // Now split freelancerPayout and freelancerYield among recipients
+            uint256 totalDistributedPayout = 0;
+            uint256 totalDistributedYield = 0;
+            
+            for (uint256 i = 0; i < recipientsCount; i++) {
+                address recipient = jobRecipients[jobId][i];
+                uint256 splitPct = jobSplits[jobId][i];
+                
+                uint256 payoutShare;
+                uint256 yieldShare;
+                
+                if (i == recipientsCount - 1) {
+                    // Prevent dust loss by assigning the remainder to the last recipient
+                    payoutShare = freelancerPayout - totalDistributedPayout;
+                    yieldShare = freelancerYield - totalDistributedYield;
+                } else {
+                    payoutShare = (freelancerPayout * splitPct) / 100;
+                    yieldShare = (freelancerYield * splitPct) / 100;
+                }
+                
+                totalDistributedPayout += payoutShare;
+                totalDistributedYield += yieldShare;
+                
+                uint256 totalRecipientPayout = payoutShare + yieldShare;
+                if (totalRecipientPayout > 0) {
+                    if (keccak256(abi.encodePacked(jobPayoutCurrency[jobId])) == keccak256(abi.encodePacked("EURC")) && stableFXRouter != address(0)) {
+                        usdcToken.approve(stableFXRouter, totalRecipientPayout);
+                        IStableFXRouter(stableFXRouter).swap(
+                            address(usdcToken),
+                            address(eurcToken),
+                            totalRecipientPayout,
+                            0,
+                            recipient
+                        );
+                    } else {
+                        require(usdcToken.transfer(recipient, totalRecipientPayout), "Recipient payout failed");
+                    }
+                }
+            }
         }
 
         emit MilestoneCompleted(jobId, milestoneIndex, payout);
@@ -554,7 +700,13 @@ contract GigMarketEscrow {
             clientYield = (yieldAccrued * 30) / 100;
             platformYield = yieldAccrued - freelancerYield - clientYield;
             
-            platformFeesAccumulated += platformYield;
+            if (treasury != address(0) && platformYield > 0) {
+                require(usdcToken.transfer(treasury, platformYield), "Platform yield transfer failed");
+                emit PlatformFeeRouted(jobId, treasury, platformYield);
+            } else {
+                platformFeesAccumulated += platformYield;
+            }
+            
             job.accumulatedYield += yieldAccrued;
             job.yieldDistributed += yieldAccrued;
             
@@ -562,7 +714,26 @@ contract GigMarketEscrow {
                 require(usdcToken.transfer(job.client, clientYield), "Client yield transfer failed");
             }
             if (freelancerYield > 0) {
-                require(usdcToken.transfer(job.freelancer, freelancerYield), "Freelancer yield transfer failed");
+                uint256 recipientsCount = jobRecipients[jobId].length;
+                if (recipientsCount == 0) {
+                    require(usdcToken.transfer(job.freelancer, freelancerYield), "Freelancer yield transfer failed");
+                } else {
+                    uint256 totalDistributed = 0;
+                    for (uint256 i = 0; i < recipientsCount; i++) {
+                        address recipient = jobRecipients[jobId][i];
+                        uint256 splitPct = jobSplits[jobId][i];
+                        uint256 share;
+                        if (i == recipientsCount - 1) {
+                            share = freelancerYield - totalDistributed;
+                        } else {
+                            share = (freelancerYield * splitPct) / 100;
+                        }
+                        totalDistributed += share;
+                        if (share > 0) {
+                            require(usdcToken.transfer(recipient, share), "Recipient yield split failed");
+                        }
+                    }
+                }
             }
         }
 
@@ -573,7 +744,13 @@ contract GigMarketEscrow {
         // Juror incentive: 2% of total distributed to jurors, 1% to platform
         uint256 jurorRewardPool = (totalEscrowed * 2) / 100;
         uint256 platformShare = arbitrationFee - jurorRewardPool;
-        platformFeesAccumulated += platformShare;
+        
+        if (treasury != address(0) && platformShare > 0) {
+            require(usdcToken.transfer(treasury, platformShare), "Platform fee transfer failed");
+            emit PlatformFeeRouted(jobId, treasury, platformShare);
+        } else {
+            platformFeesAccumulated += platformShare;
+        }
 
         // Distribute rewards to jurors
         if (totalVotes > 0 && jurorRewardPool > 0) {
@@ -598,14 +775,54 @@ contract GigMarketEscrow {
         } 
         else if (winner == VoteOption.FreelancerWins) {
             // Freelancer wins: payout remaining budget + return freelancer stake to freelancer
-            require(usdcToken.transfer(job.freelancer, netEscrowed), "Freelancer transfer failed");
+            uint256 recipientsCount = jobRecipients[jobId].length;
+            if (recipientsCount == 0) {
+                require(usdcToken.transfer(job.freelancer, netEscrowed), "Freelancer transfer failed");
+            } else {
+                uint256 totalDistributed = 0;
+                for (uint256 i = 0; i < recipientsCount; i++) {
+                    address recipient = jobRecipients[jobId][i];
+                    uint256 splitPct = jobSplits[jobId][i];
+                    uint256 share;
+                    if (i == recipientsCount - 1) {
+                        share = netEscrowed - totalDistributed;
+                    } else {
+                        share = (netEscrowed * splitPct) / 100;
+                    }
+                    totalDistributed += share;
+                    if (share > 0) {
+                        require(usdcToken.transfer(recipient, share), "Recipient transfer failed");
+                    }
+                }
+            }
             reputation[job.freelancer] += 1;
         } 
         else {
             // Split: split netEscrowed 50/50
             uint256 splitAmt = netEscrowed / 2;
+            uint256 freelancerAmt = netEscrowed - splitAmt;
             require(usdcToken.transfer(job.client, splitAmt), "Client split failed");
-            require(usdcToken.transfer(job.freelancer, splitAmt), "Freelancer split failed");
+            
+            uint256 recipientsCount = jobRecipients[jobId].length;
+            if (recipientsCount == 0) {
+                require(usdcToken.transfer(job.freelancer, freelancerAmt), "Freelancer split failed");
+            } else {
+                uint256 totalDistributed = 0;
+                for (uint256 i = 0; i < recipientsCount; i++) {
+                    address recipient = jobRecipients[jobId][i];
+                    uint256 splitPct = jobSplits[jobId][i];
+                    uint256 share;
+                    if (i == recipientsCount - 1) {
+                        share = freelancerAmt - totalDistributed;
+                    } else {
+                        share = (freelancerAmt * splitPct) / 100;
+                    }
+                    totalDistributed += share;
+                    if (share > 0) {
+                        require(usdcToken.transfer(recipient, share), "Recipient split failed");
+                    }
+                }
+            }
         }
 
         emit DisputeResolved(jobId, winner);
