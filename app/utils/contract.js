@@ -52,6 +52,58 @@ export const GIGMARKET_ESCROW_ABI = [
     outputs: [{ name: '', type: 'uint256' }]
   },
   {
+    name: 'createPrivateJob',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'budgetCommitment', type: 'bytes32' },
+      { name: 'zkpProof', type: 'bytes' },
+      { name: 'encryptedDetails', type: 'string' },
+      { name: 'publicBudgetAmount', type: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    name: 'joinPrivateJob',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'jobId', type: 'uint256' },
+      { name: 'freelancerStakeAmount', type: 'uint256' },
+      { name: 'stakeCommitment', type: 'bytes32' },
+      { name: 'zkpProof', type: 'bytes' }
+    ],
+    outputs: []
+  },
+  {
+    name: 'approvePrivateMilestone',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'jobId', type: 'uint256' },
+      { name: 'milestoneIndex', type: 'uint256' },
+      { name: 'payoutAmount', type: 'uint256' },
+      { name: 'payoutCommitment', type: 'bytes32' },
+      { name: 'zkpProof', type: 'bytes' },
+      { name: 'isLastMilestone', type: 'bool' }
+    ],
+    outputs: []
+  },
+  {
+    name: 'isPrivateJob',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'uint256' }],
+    outputs: [{ name: '', type: 'bool' }]
+  },
+  {
+    name: 'jobEncryptedDetails',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'uint256' }],
+    outputs: [{ name: '', type: 'string' }]
+  },
+  {
     name: 'joinJob',
     type: 'function',
     stateMutability: 'nonpayable',
@@ -184,3 +236,106 @@ export const GIGMARKET_ESCROW_ABI = [
     outputs: [{ name: '', type: 'uint256' }]
   }
 ];
+
+export const AGENT_ESCROW_8183_ABI = [
+  {
+    name: 'createJob',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'provider', type: 'address' },
+      { name: 'evaluator', type: 'address' },
+      { name: 'token', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'expiry', type: 'uint256' }
+    ],
+    outputs: [{ name: 'jobId', type: 'uint256' }]
+  },
+  {
+    name: 'fundJob',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'jobId', type: 'uint256' }],
+    outputs: []
+  },
+  {
+    name: 'commitToJob',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'jobId', type: 'uint256' },
+      { name: 'signature', type: 'bytes' }
+    ],
+    outputs: []
+  },
+  {
+    name: 'submitWork',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'jobId', type: 'uint256' },
+      { name: 'deliverableHash', type: 'bytes32' }
+    ],
+    outputs: []
+  },
+  {
+    name: 'completeJob',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'jobId', type: 'uint256' }],
+    outputs: []
+  },
+  {
+    name: 'rejectJob',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'jobId', type: 'uint256' }],
+    outputs: []
+  },
+  {
+    name: 'getJob',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'jobId', type: 'uint256' }],
+    outputs: [
+      {
+        type: 'tuple',
+        name: '',
+        components: [
+          { name: 'client', type: 'address' },
+          { name: 'provider', type: 'address' },
+          { name: 'evaluator', type: 'address' },
+          { name: 'token', type: 'address' },
+          { name: 'amount', type: 'uint256' },
+          { name: 'expiry', type: 'uint256' },
+          { name: 'status', type: 'uint8' },
+          { name: 'deliverableHash', type: 'bytes32' }
+        ]
+      }
+    ]
+  },
+  {
+    name: 'jobs',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'uint256' }],
+    outputs: [
+      { name: 'client', type: 'address' },
+      { name: 'provider', type: 'address' },
+      { name: 'evaluator', type: 'address' },
+      { name: 'token', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'expiry', type: 'uint256' },
+      { name: 'status', type: 'uint8' },
+      { name: 'deliverableHash', type: 'bytes32' }
+    ]
+  },
+  {
+    name: 'jobCount',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }]
+  }
+];
+

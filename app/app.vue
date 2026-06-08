@@ -280,7 +280,10 @@
           <span class="nav-link" :class="{ active: currentTab === 'freelancer' }" @click="currentTab = 'freelancer'">Freelancer Portal</span>
           <span class="nav-link" :class="{ active: currentTab === 'jury' }" @click="currentTab = 'jury'">Jury Board</span>
           <span class="nav-link" :class="{ active: currentTab === 'appkit' }" @click="currentTab = 'appkit'">App Kit Center</span>
+          <span class="nav-link" :class="{ active: currentTab === 'agentic' }" @click="currentTab = 'agentic'">🤖 AI Agent Escrow (ERC-8183)</span>
+          <span class="nav-link" :class="{ active: currentTab === 'nanopay' }" @click="currentTab = 'nanopay'">⚡ Gateway Nanopayments (x402)</span>
         </div>
+
 
         <!-- Main Dashboard Tab Content -->
         <div v-if="currentTab === 'client'" class="tab-content">
@@ -369,6 +372,14 @@
                 </div>
               </div>
 
+              <!-- Confidential Escrow Toggle -->
+              <div style="margin-top: 15px; border-top: 2px solid var(--border-color); padding-top: 15px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--text-primary);">
+                  <input type="checkbox" v-model="newJob.isPrivate" style="accent-color: var(--accent-teal);" />
+                  🔒 Enable Opt-in Privacy (Confidential Escrow)
+                </label>
+              </div>
+
               <div style="margin-top: 24px;">
                 <button type="submit" class="btn btn-primary" style="width: 100%;" :disabled="isSubmitting">
                   <span v-if="isSubmitting">Funding Escrow...</span>
@@ -394,13 +405,33 @@
                 <div v-for="job in clientJobs" :key="job.id" class="glass-panel" style="background: var(--bg-primary); border: 2px solid var(--border-color); box-shadow: 2px 2px 0px var(--border-color);">
                   <div class="gig-card-header">
                     <div>
-                      <h4 class="gig-title">{{ job.title }}</h4>
-                      <span style="font-size: 12px; color: var(--text-secondary); font-family: monospace;">Job ID: #{{ job.id }} | Repo: {{ job.repoUrl }}</span>
+                      <h4 class="gig-title">
+                        <span v-if="job.isPrivate">🔒 </span>
+                        {{ job.title }}
+                      </h4>
+                      <span v-if="!job.isPrivate || job.decrypted" style="font-size: 12px; color: var(--text-secondary); font-family: monospace;">Job ID: #{{ job.id }} | Repo: {{ job.repoUrl }}</span>
+                      <span v-else style="font-size: 12px; color: var(--text-secondary); font-family: monospace;">Job ID: #{{ job.id }} | Repo: 🔒 Confidential</span>
                     </div>
                     <span class="badge" :class="'badge-' + job.status.toLowerCase()">{{ job.status }}</span>
                   </div>
-                  <p class="gig-desc">{{ job.description }}</p>
-                  <div class="gig-meta">
+                  <p v-if="!job.isPrivate || job.decrypted" class="gig-desc">{{ job.description }}</p>
+                  <p v-else class="gig-desc" style="font-style: italic; color: var(--text-secondary);">This agreement's details are confidential.</p>
+
+                  <!-- Privacy Decryption Box -->
+                  <div v-if="job.isPrivate && !job.decrypted" style="margin-top: 15px; padding: 15px; border: 2px solid var(--border-color); background: var(--bg-secondary); border-radius: var(--border-radius-sm); box-shadow: 2px 2px 0px var(--border-color);">
+                    <div style="font-weight: 700; color: var(--accent-magenta); font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                      🔒 Confidential Escrow Agreement
+                    </div>
+                    <p style="font-size: 12px; color: var(--text-secondary); margin: 6px 0 12px 0; line-height: 1.4;">
+                      This agreement is encrypted on-chain. Enter the 256-bit symmetric Viewer Key to view budget details, description, repository details, and milestones.
+                    </p>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                      <input v-model="viewerKeysInput[job.id]" type="text" class="form-input" style="font-family: monospace; font-size: 12px; padding: 6px 10px;" placeholder="Viewer Key (0x...)" />
+                      <button class="btn btn-accent btn-small" style="margin: 0; padding: 6px 14px; min-height: auto;" @click="decryptJob(job)">Decrypt</button>
+                    </div>
+                  </div>
+
+                  <div v-if="!job.isPrivate || job.decrypted" class="gig-meta">
                     <div class="gig-meta-item">
                       <span class="gig-meta-label">Total Budget</span>
                       <span class="gig-meta-value">{{ job.budget }} USDC</span>
@@ -421,7 +452,7 @@
                   </div>
 
                   <!-- Team Split Ratios Display (Feature F) -->
-                  <div v-if="job.recipients && job.recipients.length > 0" style="margin-top: 15px; background: var(--bg-secondary); border: 2px solid var(--border-color); padding: 12px; border-radius: var(--border-radius-sm); box-shadow: 2px 2px 0px var(--border-color);">
+                  <div v-if="(!job.isPrivate || job.decrypted) && job.recipients && job.recipients.length > 0" style="margin-top: 15px; background: var(--bg-secondary); border: 2px solid var(--border-color); padding: 12px; border-radius: var(--border-radius-sm); box-shadow: 2px 2px 0px var(--border-color);">
                     <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--accent-purple); margin-bottom: 6px;">👥 Team Split Ratios</div>
                     <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-family: monospace;">
                       <div v-for="(recip, idx) in job.recipients" :key="idx" style="display: flex; justify-content: space-between;">
@@ -432,7 +463,7 @@
                   </div>
 
                   <!-- CCTP Bridged Escrow Details -->
-                  <div v-if="job.fundingMethod === 'cross-chain'" style="margin-top: 15px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-family: monospace; background: var(--accent-teal-light); border: 2.5px solid var(--border-color); padding: 10px; border-radius: var(--border-radius-sm);">
+                  <div v-if="(!job.isPrivate || job.decrypted) && job.fundingMethod === 'cross-chain'" style="margin-top: 15px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-family: monospace; background: var(--accent-teal-light); border: 2.5px solid var(--border-color); padding: 10px; border-radius: var(--border-radius-sm);">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                       <span style="font-weight: 700; color: var(--accent-teal-dark);">🔀 CCTP Bridged (from {{ job.sourceChain ? job.sourceChain.replace('_', ' ') : 'Base Sepolia' }})</span>
                       <span v-if="job.bridgeVerified" style="color: var(--accent-green); font-weight: 700;">✓ Verified</span>
@@ -445,7 +476,7 @@
                   </div>
 
                   <!-- Milestones checklist -->
-                  <div style="margin-top: 15px;">
+                  <div v-if="!job.isPrivate || job.decrypted" style="margin-top: 15px;">
                     <h5 style="font-size: 13px; margin-bottom: 8px; color: var(--accent-teal-dark);">Milestones Details</h5>
                     <div v-for="(m, idx) in job.milestones" :key="idx" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg-secondary); border: 1.5px solid var(--border-color); margin-bottom: 6px; border-radius: 8px;">
                       <div style="display: flex; flex-direction: column; align-items: flex-start;">
@@ -467,8 +498,29 @@
                     </div>
                   </div>
 
-                  <div v-if="job.status === 'Active'" style="margin-top: 15px; display: flex; justify-content: flex-end;">
+                  <div v-if="(!job.isPrivate || job.decrypted) && job.status === 'Active'" style="margin-top: 15px; display: flex; justify-content: flex-end;">
                     <button class="btn btn-danger btn-small" @click="raiseDispute(job.id)">Raise Dispute</button>
+                  </div>
+
+                  <!-- Dispute Appeal Panel for Client -->
+                  <div v-if="job.status === 'AppealPending'" style="margin-top: 15px; padding: 12px; background: var(--bg-secondary); border-radius: var(--border-radius-sm); border: 2px solid var(--border-color); box-shadow: 2px 2px 0px var(--border-color);">
+                    <div style="font-size: 13px; font-weight: 700; color: var(--accent-teal-dark); margin-bottom: 6px;">
+                      ⚖️ Dispute Appeal Window Open
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
+                      Current Ruling: <strong>{{ getRulingLabel(job.dispute?.ruling) }}</strong> (Tier {{ job.dispute?.appealTier }})
+                    </div>
+                    <div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center;">
+                      <span v-if="!isAppealWindowClosed(job) && job.dispute?.appealTier < 2" style="font-size: 11px; color: var(--text-secondary);">
+                        Fee: {{ job.dispute?.appealTier === 0 ? '100' : '200' }} USDC
+                      </span>
+                      <button v-if="!isAppealWindowClosed(job) && job.dispute?.appealTier < 2" class="btn btn-accent btn-small" @click="openAppealModal(job.id)" :disabled="isSubmitting">
+                        Appeal Ruling
+                      </button>
+                      <button v-if="isAppealWindowClosed(job)" class="btn btn-accent btn-small" @click="executeRuling(job.id)" :disabled="isSubmitting">
+                        Execute Ruling
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -581,13 +633,33 @@
                 <div v-for="job in openJobs" :key="job.id" class="glass-panel" style="background: var(--bg-primary); border: 2px solid var(--border-color); box-shadow: 2px 2px 0px var(--border-color);">
                   <div class="gig-card-header">
                     <div>
-                      <h4 class="gig-title">{{ job.title }}</h4>
-                      <span style="font-size: 12px; color: var(--text-secondary); font-family: monospace;">Repo: {{ job.repoUrl }}</span>
+                      <h4 class="gig-title">
+                        <span v-if="job.isPrivate">🔒 </span>
+                        {{ job.title }}
+                      </h4>
+                      <span v-if="!job.isPrivate || job.decrypted" style="font-size: 12px; color: var(--text-secondary); font-family: monospace;">Repo: {{ job.repoUrl }}</span>
+                      <span v-else style="font-size: 12px; color: var(--text-secondary); font-family: monospace;">Repo: 🔒 Confidential</span>
                     </div>
                     <span class="badge badge-created">Open</span>
                   </div>
-                  <p class="gig-desc">{{ job.description }}</p>
-                  <div class="gig-meta">
+                  <p v-if="!job.isPrivate || job.decrypted" class="gig-desc">{{ job.description }}</p>
+                  <p v-else class="gig-desc" style="font-style: italic; color: var(--text-secondary);">This agreement's details are confidential.</p>
+
+                  <!-- Privacy Decryption Box -->
+                  <div v-if="job.isPrivate && !job.decrypted" style="margin-top: 15px; padding: 15px; border: 2px solid var(--border-color); background: var(--bg-secondary); border-radius: var(--border-radius-sm); box-shadow: 2px 2px 0px var(--border-color);">
+                    <div style="font-weight: 700; color: var(--accent-magenta); font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                      🔒 Confidential Escrow Agreement
+                    </div>
+                    <p style="font-size: 12px; color: var(--text-secondary); margin: 6px 0 12px 0; line-height: 1.4;">
+                      This agreement is encrypted on-chain. Enter the 256-bit symmetric Viewer Key to view budget details, description, repository details, and milestones.
+                    </p>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                      <input v-model="viewerKeysInput[job.id]" type="text" class="form-input" style="font-family: monospace; font-size: 12px; padding: 6px 10px;" placeholder="Viewer Key (0x...)" />
+                      <button class="btn btn-accent btn-small" style="margin: 0; padding: 6px 14px; min-height: auto;" @click="decryptJob(job)">Decrypt</button>
+                    </div>
+                  </div>
+
+                  <div v-if="!job.isPrivate || job.decrypted" class="gig-meta">
                     <div class="gig-meta-item">
                       <span class="gig-meta-label">Budget</span>
                       <span class="gig-meta-value" style="color: var(--accent-teal-dark);">
@@ -617,7 +689,7 @@
                   </div>
 
                   <!-- Team Split Ratios Display (Feature F) -->
-                  <div v-if="job.recipients && job.recipients.length > 0" style="margin-top: 15px; background: var(--bg-secondary); border: 2px solid var(--border-color); padding: 12px; border-radius: var(--border-radius-sm); box-shadow: 2px 2px 0px var(--border-color);">
+                  <div v-if="(!job.isPrivate || job.decrypted) && job.recipients && job.recipients.length > 0" style="margin-top: 15px; background: var(--bg-secondary); border: 2px solid var(--border-color); padding: 12px; border-radius: var(--border-radius-sm); box-shadow: 2px 2px 0px var(--border-color);">
                     <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--accent-purple); margin-bottom: 6px;">👥 Team Split Ratios</div>
                     <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-family: monospace;">
                       <div v-for="(recip, idx) in job.recipients" :key="idx" style="display: flex; justify-content: space-between;">
@@ -628,7 +700,7 @@
                   </div>
 
                   <!-- CCTP Bridged Escrow Details -->
-                  <div v-if="job.fundingMethod === 'cross-chain'" style="margin-top: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-family: monospace; background: var(--accent-teal-light); border: 2.5px solid var(--border-color); padding: 10px; border-radius: var(--border-radius-sm);">
+                  <div v-if="(!job.isPrivate || job.decrypted) && job.fundingMethod === 'cross-chain'" style="margin-top: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-family: monospace; background: var(--accent-teal-light); border: 2.5px solid var(--border-color); padding: 10px; border-radius: var(--border-radius-sm);">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                       <span style="font-weight: 700; color: var(--accent-teal-dark);">🔀 CCTP Bridged (from {{ job.sourceChain ? job.sourceChain.replace('_', ' ') : 'Base Sepolia' }})</span>
                       <span v-if="job.bridgeVerified" style="color: var(--accent-green); font-weight: 700;">✓ Verified</span>
@@ -641,7 +713,7 @@
                   </div>
 
                   <!-- Apply/Join with Team Split Configuration (Feature F) -->
-                  <div style="margin-top: 12px; border-top: 1.5px solid var(--border-color); padding-top: 12px; margin-bottom: 12px;">
+                  <div v-if="!job.isPrivate || job.decrypted" style="margin-top: 12px; border-top: 1.5px solid var(--border-color); padding-top: 12px; margin-bottom: 12px;">
                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; font-weight: 700; color: var(--text-primary);">
                       <input type="checkbox" v-model="getJoinSplitConfig(job.id).enable" style="accent-color: var(--accent-teal);" />
                       Apply/Join with Team Split Payouts
@@ -660,7 +732,7 @@
                   </div>
 
                   <div style="display: flex; justify-content: flex-end;">
-                    <button class="btn btn-primary btn-small" @click="joinGig(job)" :disabled="isSubmitting">
+                    <button class="btn btn-primary btn-small" @click="joinGig(job)" :disabled="isSubmitting || (job.isPrivate && !job.decrypted)">
                       Approve & Stake to Join
                     </button>
                   </div>
@@ -678,13 +750,33 @@
                 <div v-for="job in joinedJobs" :key="job.id" class="glass-panel" style="background: var(--bg-primary); border: 2px solid var(--border-color); box-shadow: 2px 2px 0px var(--border-color);">
                   <div class="gig-card-header">
                     <div>
-                      <h4 class="gig-title">{{ job.title }}</h4>
-                      <span style="font-size: 12px; color: var(--text-secondary); font-family: monospace;">Repo: {{ job.repoUrl }}</span>
+                      <h4 class="gig-title">
+                        <span v-if="job.isPrivate">🔒 </span>
+                        {{ job.title }}
+                      </h4>
+                      <span v-if="!job.isPrivate || job.decrypted" style="font-size: 12px; color: var(--text-secondary); font-family: monospace;">Repo: {{ job.repoUrl }}</span>
+                      <span v-else style="font-size: 12px; color: var(--text-secondary); font-family: monospace;">Repo: 🔒 Confidential</span>
                     </div>
                     <span class="badge" :class="'badge-' + job.status.toLowerCase()">{{ job.status }}</span>
                   </div>
-                  <p class="gig-desc">{{ job.description }}</p>
-                  <div class="gig-meta">
+                  <p v-if="!job.isPrivate || job.decrypted" class="gig-desc">{{ job.description }}</p>
+                  <p v-else class="gig-desc" style="font-style: italic; color: var(--text-secondary);">This agreement's details are confidential.</p>
+
+                  <!-- Privacy Decryption Box -->
+                  <div v-if="job.isPrivate && !job.decrypted" style="margin-top: 15px; padding: 15px; border: 2px solid var(--border-color); background: var(--bg-secondary); border-radius: var(--border-radius-sm); box-shadow: 2px 2px 0px var(--border-color);">
+                    <div style="font-weight: 700; color: var(--accent-magenta); font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                      🔒 Confidential Escrow Agreement
+                    </div>
+                    <p style="font-size: 12px; color: var(--text-secondary); margin: 6px 0 12px 0; line-height: 1.4;">
+                      This agreement is encrypted on-chain. Enter the 256-bit symmetric Viewer Key to view budget details, description, repository details, and milestones.
+                    </p>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                      <input v-model="viewerKeysInput[job.id]" type="text" class="form-input" style="font-family: monospace; font-size: 12px; padding: 6px 10px;" placeholder="Viewer Key (0x...)" />
+                      <button class="btn btn-accent btn-small" style="margin: 0; padding: 6px 14px; min-height: auto;" @click="decryptJob(job)">Decrypt</button>
+                    </div>
+                  </div>
+
+                  <div v-if="!job.isPrivate || job.decrypted" class="gig-meta">
                     <div class="gig-meta-item">
                       <span class="gig-meta-label">Project Budget</span>
                       <span class="gig-meta-value">{{ job.budget }} USDC</span>
@@ -709,7 +801,7 @@
                   </div>
 
                   <!-- Team Split Ratios Display (Feature F) -->
-                  <div v-if="job.recipients && job.recipients.length > 0" style="margin-top: 15px; background: var(--bg-secondary); border: 2px solid var(--border-color); padding: 12px; border-radius: var(--border-radius-sm); box-shadow: 2px 2px 0px var(--border-color);">
+                  <div v-if="(!job.isPrivate || job.decrypted) && job.recipients && job.recipients.length > 0" style="margin-top: 15px; background: var(--bg-secondary); border: 2px solid var(--border-color); padding: 12px; border-radius: var(--border-radius-sm); box-shadow: 2px 2px 0px var(--border-color);">
                     <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--accent-purple); margin-bottom: 6px;">👥 Team Split Ratios</div>
                     <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-family: monospace;">
                       <div v-for="(recip, idx) in job.recipients" :key="idx" style="display: flex; justify-content: space-between;">
@@ -720,7 +812,7 @@
                   </div>
 
                   <!-- CCTP Bridged Escrow Details -->
-                  <div v-if="job.fundingMethod === 'cross-chain'" style="margin-top: 15px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-family: monospace; background: var(--accent-teal-light); border: 2.5px solid var(--border-color); padding: 10px; border-radius: var(--border-radius-sm);">
+                  <div v-if="(!job.isPrivate || job.decrypted) && job.fundingMethod === 'cross-chain'" style="margin-top: 15px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-family: monospace; background: var(--accent-teal-light); border: 2.5px solid var(--border-color); padding: 10px; border-radius: var(--border-radius-sm);">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                       <span style="font-weight: 700; color: var(--accent-teal-dark);">🔀 CCTP Bridged (from {{ job.sourceChain ? job.sourceChain.replace('_', ' ') : 'Base Sepolia' }})</span>
                       <span v-if="job.bridgeVerified" style="color: var(--accent-green); font-weight: 700;">✓ Verified</span>
@@ -732,8 +824,8 @@
                     </div>
                   </div>
 
-                  <!-- Payout Currency Preference Selector -->
-                  <div style="margin-top: 15px; border-top: 2.5px solid var(--border-color); padding-top: 15px; margin-bottom: 15px;">
+                  <!-- Preferred Payout Currency Preference Selector -->
+                  <div v-if="!job.isPrivate || job.decrypted" style="margin-top: 15px; border-top: 2.5px solid var(--border-color); padding-top: 15px; margin-bottom: 15px;">
                     <label class="form-label" style="font-weight: 700;">Preferred Payout Currency</label>
                     <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px;">
                       <select v-model="job.payoutCurrency" class="form-input" style="padding: 8px 12px; font-size: 13px; width: 150px;" @change="updatePayoutCurrencyPreference(job)">
@@ -747,7 +839,7 @@
                   </div>
 
                   <!-- Simulate PR merge (Feature B) -->
-                  <div v-if="job.status === 'Active'" style="border: 2px dashed var(--border-color); border-radius: var(--border-radius-sm); padding: 16px; background: var(--bg-secondary); margin-top: 15px; box-shadow: 3px 3px 0px var(--border-color);">
+                  <div v-if="(!job.isPrivate || job.decrypted) && job.status === 'Active'" style="border: 2px dashed var(--border-color); border-radius: var(--border-radius-sm); padding: 16px; background: var(--bg-secondary); margin-top: 15px; box-shadow: 3px 3px 0px var(--border-color);">
                     <h5 style="font-size: 14px; margin-bottom: 8px; color: var(--accent-teal-dark);">Simulate GitHub Merge Auto-Payout (Feature B)</h5>
                     <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
                       Simulates merging a pull request into the repo branch. This fires our server webhook, which uses the 
@@ -766,8 +858,29 @@
                     </div>
                   </div>
 
-                  <div v-if="job.status === 'Active'" style="margin-top: 15px; display: flex; justify-content: flex-end;">
+                  <div v-if="(!job.isPrivate || job.decrypted) && job.status === 'Active'" style="margin-top: 15px; display: flex; justify-content: flex-end;">
                     <button class="btn btn-danger btn-small" @click="raiseDispute(job.id)">Raise Dispute</button>
+                  </div>
+
+                  <!-- Dispute Appeal Panel for Freelancer -->
+                  <div v-if="job.status === 'AppealPending'" style="margin-top: 15px; padding: 12px; background: var(--bg-secondary); border-radius: var(--border-radius-sm); border: 2px solid var(--border-color); box-shadow: 2px 2px 0px var(--border-color);">
+                    <div style="font-size: 13px; font-weight: 700; color: var(--accent-teal-dark); margin-bottom: 6px;">
+                      ⚖️ Dispute Appeal Window Open
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
+                      Current Ruling: <strong>{{ getRulingLabel(job.dispute?.ruling) }}</strong> (Tier {{ job.dispute?.appealTier }})
+                    </div>
+                    <div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center;">
+                      <span v-if="!isAppealWindowClosed(job) && job.dispute?.appealTier < 2" style="font-size: 11px; color: var(--text-secondary);">
+                        Fee: {{ job.dispute?.appealTier === 0 ? '100' : '200' }} USDC
+                      </span>
+                      <button v-if="!isAppealWindowClosed(job) && job.dispute?.appealTier < 2" class="btn btn-accent btn-small" @click="openAppealModal(job.id)" :disabled="isSubmitting">
+                        Appeal Ruling
+                      </button>
+                      <button v-if="isAppealWindowClosed(job)" class="btn btn-accent btn-small" @click="executeRuling(job.id)" :disabled="isSubmitting">
+                        Execute Ruling
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -847,6 +960,40 @@
               <button v-else class="btn btn-accent" style="width: 100%;" @click="registerJuror" :disabled="isSubmitting">
                 Register as Juror On-Chain
               </button>
+
+              <!-- Juror Profile Metrics Dashboard -->
+              <div v-if="userIsJuror" style="margin-top: 24px; border-top: 2px dashed var(--border-color); padding-top: 20px; text-align: left;">
+                <h4 style="margin-bottom: 15px; color: var(--text-primary); font-size: 16px;">Juror Dashboard</h4>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+                  <div style="background: var(--bg-secondary); border: 1.5px solid var(--border-color); padding: 10px; border-radius: 8px;">
+                    <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Reputation</div>
+                    <div style="font-size: 18px; font-weight: 800; color: var(--accent-teal-dark);">{{ jurorReputationScore }}</div>
+                  </div>
+                  <div style="background: var(--bg-secondary); border: 1.5px solid var(--border-color); padding: 10px; border-radius: 8px;">
+                    <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Active Stake</div>
+                    <div style="font-size: 18px; font-weight: 800; color: var(--accent-magenta);">{{ jurorActiveStake }} USDC</div>
+                  </div>
+                </div>
+
+                <h5 style="margin-bottom: 10px; font-size: 11px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Voting History</h5>
+                <div v-if="jurorHistory.length === 0" style="font-size: 13px; color: var(--text-secondary); font-style: italic;">
+                  No vote history found.
+                </div>
+                <div v-else style="display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; padding-right: 4px;">
+                  <div v-for="h in jurorHistory" :key="h.jobId" style="background: var(--bg-secondary); border: 1.5px solid var(--border-color); padding: 8px 12px; border-radius: 6px; font-size: 12px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                      <span style="font-weight: 600;">Job #{{ h.jobId }}</span>
+                      <span style="color: var(--text-secondary); margin-left: 6px;">Voted: {{ getRulingLabel(h.vote) }}</span>
+                    </div>
+                    <div>
+                      <span v-if="h.wasMajority === true" class="badge" style="background: var(--accent-teal-light); color: var(--accent-teal-dark);">+{{ h.rewardEarned || 10 }} Rep</span>
+                      <span v-else-if="h.wasMajority === false" class="badge" style="background: var(--accent-orange-light); color: var(--accent-orange-dark);">-{{ h.stakeSlashed || 50 }} USDC</span>
+                      <span v-else class="badge" style="background: var(--bg-primary); color: var(--text-secondary);">Pending</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -884,8 +1031,8 @@
                 </div>
 
                 <!-- Jury Voting System -->
-                <div style="margin-top: 20px; padding: 16px; background: var(--bg-secondary); border-radius: var(--border-radius-sm); border: 2px solid var(--border-color); box-shadow: 2px 2px 0px var(--border-color);">
-                  <h5 style="font-size: 14px; margin-bottom: 12px;">Jury Vote Cast (Current Standings)</h5>
+                <div v-if="job.status === 'Disputed'" style="margin-top: 20px; padding: 16px; background: var(--bg-secondary); border-radius: var(--border-radius-sm); border: 2px solid var(--border-color); box-shadow: 2px 2px 0px var(--border-color);">
+                  <h5 style="font-size: 14px; margin-bottom: 12px;">Jury Vote Cast (Current Standings) - Tier {{ job.dispute?.appealTier || 0 }}</h5>
                   <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; text-align: center;">
                     <div style="background: var(--accent-teal-light); border: 1.5px solid var(--border-color); padding: 10px; border-radius: 8px;">
                       <div style="font-size: 18px; font-weight: 800; color: var(--accent-teal-dark);">{{ disputeVotes[job.id]?.clientVotes || 0 }}</div>
@@ -912,11 +1059,65 @@
                   </div>
                 </div>
 
-                <!-- Executable Action -->
-                <div style="margin-top: 15px; display: flex; justify-content: flex-end;">
-                  <button class="btn btn-accent btn-small" @click="resolveDispute(job.id)" :disabled="isSubmitting">
-                    Resolve & Distribute Escrow
-                  </button>
+                <!-- Appeal Pending details -->
+                <div v-else-if="job.status === 'AppealPending'" style="margin-top: 20px; padding: 16px; background: var(--bg-secondary); border-radius: var(--border-radius-sm); border: 2px solid var(--border-color); box-shadow: 2px 2px 0px var(--border-color);">
+                  <h5 style="font-size: 14px; margin-bottom: 8px; color: var(--accent-teal-dark);">⚖️ Temporary Ruling Decided</h5>
+                  <div style="font-size: 14px; color: var(--text-primary); margin-bottom: 15px;">
+                    Ruling: <strong>{{ getRulingLabel(job.dispute?.ruling) }}</strong>
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px; margin-bottom: 15px;">
+                    <div style="background: var(--bg-primary); padding: 10px; border-radius: 6px; border: 1.5px solid var(--border-color);">
+                      <span style="color: var(--text-secondary); display: block; font-size: 10px; text-transform: uppercase;">Current Tier</span>
+                      <strong>Tier {{ job.dispute?.appealTier }}</strong>
+                    </div>
+                    <div style="background: var(--bg-primary); padding: 10px; border-radius: 6px; border: 1.5px solid var(--border-color);">
+                      <span style="color: var(--text-secondary); display: block; font-size: 10px; text-transform: uppercase;">Appeal Pot</span>
+                      <strong>{{ job.dispute?.totalAppealPot }} USDC</strong>
+                    </div>
+                  </div>
+                  <div style="font-size: 12px; color: var(--text-secondary);">
+                    Appeal deadline: <strong style="color: var(--text-primary);">{{ formatDeadline(job.dispute?.appealDeadline) }}</strong>
+                  </div>
+                </div>
+
+                <!-- Executable Actions -->
+                <div style="margin-top: 15px; display: flex; justify-content: flex-end; align-items: center; gap: 10px;">
+                  <!-- Resolve Tier 0/1 dispute (move to AppealPending) -->
+                  <div v-if="job.status === 'Disputed'" style="display: flex; justify-content: flex-end; align-items: center; width: 100%;">
+                    <span style="font-size: 11px; color: var(--text-secondary); margin-right: 10px;">
+                      {{ job.dispute?.appealTier === 1 ? 'Tier 1: Requires 3+ votes' : 'Tier 0: Requires 1+ vote' }}
+                    </span>
+                    <button class="btn btn-accent btn-small" @click="resolveDispute(job.id)" :disabled="isSubmitting">
+                      Resolve & Distribute Escrow
+                    </button>
+                  </div>
+
+                  <!-- Appeal/Execution buttons when AppealPending -->
+                  <div v-else-if="job.status === 'AppealPending'" style="display: flex; gap: 10px; align-items: center; width: 100%;">
+                    <!-- Owner Supreme Court Panel (if Tier 2 and open) -->
+                    <div v-if="job.dispute?.appealTier === 2 && !isAppealWindowClosed(job) && isOwner" style="width: 100%; border-top: 1px dashed var(--border-color); padding-top: 15px; margin-top: 10px;">
+                      <div style="font-size: 12px; font-weight: 700; color: var(--accent-magenta); margin-bottom: 10px; text-transform: uppercase;">
+                        🏛️ Supreme Court Action Required (Platform Owner Only)
+                      </div>
+                      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                        <button class="btn btn-secondary btn-small" @click="resolveFinalAppeal(job.id, 1)" :disabled="isSubmitting">Rule Client</button>
+                        <button class="btn btn-secondary btn-small" @click="resolveFinalAppeal(job.id, 2)" :disabled="isSubmitting">Rule Freelancer</button>
+                        <button class="btn btn-secondary btn-small" @click="resolveFinalAppeal(job.id, 3)" :disabled="isSubmitting">Rule Split</button>
+                      </div>
+                    </div>
+                    <!-- Standard Client/Freelancer Appeal -->
+                    <div v-else style="display: flex; justify-content: flex-end; width: 100%; gap: 10px; align-items: center;">
+                      <span v-if="!isAppealWindowClosed(job) && job.dispute?.appealTier < 2" style="font-size: 11px; color: var(--text-secondary);">
+                        Fee: {{ job.dispute?.appealTier === 0 ? '100' : '200' }} USDC
+                      </span>
+                      <button v-if="!isAppealWindowClosed(job) && job.dispute?.appealTier < 2" class="btn btn-accent btn-small" @click="openAppealModal(job.id)" :disabled="isSubmitting">
+                        Appeal Ruling
+                      </button>
+                      <button v-if="isAppealWindowClosed(job)" class="btn btn-accent btn-small" @click="executeRuling(job.id)" :disabled="isSubmitting">
+                        Execute Ruling Settlement
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -979,7 +1180,315 @@
           </div>
         </div>
       </div> <!-- Closes currentTab === 'appkit' -->
+
+      <!-- AI Agent Escrow (ERC-8183) Tab -->
+      <div v-else-if="currentTab === 'agentic'" class="tab-content">
+        <div style="margin-bottom: 24px; text-align: center;">
+          <span class="badge" style="background-color: var(--accent-purple); color: #fff; font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 4px 10px; border-radius: 20px;">Standard Protocol</span>
+          <h2 style="font-family: var(--font-display); font-size: 32px; color: var(--text-primary); margin-top: 8px; margin-bottom: 8px;">ERC-8183 Agentic Commerce Escrow</h2>
+          <p style="color: var(--text-secondary); max-width: 700px; margin: 0 auto; font-size: 14px;">
+            Enforce automated signature handshakes, 10% collateral staking, and testing suite oracle verification for machine-to-machine remote contracts.
+          </p>
+        </div>
+
+        <div class="portal-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+          <!-- Left: Create & Fund Agentic Job -->
+          <div class="glass-panel">
+            <h3 style="margin-bottom: 20px; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <span>📝 Launch AI Task Escrow</span>
+            </h3>
+            
+            <form @submit.prevent="createAgentJob">
+              <div class="form-group">
+                <label class="form-label">AI Agent Provider Address</label>
+                <input v-model="newAgentJob.provider" type="text" class="form-input" placeholder="0x..." required />
+                <span style="font-size: 11px; color: var(--text-secondary);">
+                  Simulated agent address (defaults to backend wallet to automate execution loops)
+                </span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Evaluator/Oracle Address</label>
+                <input v-model="newAgentJob.evaluator" type="text" class="form-input" placeholder="0x..." required />
+                <span style="font-size: 11px; color: var(--text-secondary);">
+                  System verification oracle that signs off-chain attestation
+                </span>
+              </div>
+
+              <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                <div>
+                  <label class="form-label">Amount (USDC)</label>
+                  <input v-model.number="newAgentJob.amount" type="number" class="form-input" min="1" required />
+                </div>
+                <div>
+                  <label class="form-label">Expiry (Days)</label>
+                  <input v-model.number="newAgentJob.expiryDays" type="number" class="form-input" min="1" required />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">GitHub Repository / Agent Package</label>
+                <input v-model="newAgentJob.repoUrl" type="text" class="form-input" placeholder="github.com/org/repo" required />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Deliverable Code Mock URL</label>
+                <input v-model="newAgentJob.codeUrl" type="text" class="form-input" placeholder="https://..." required />
+                <span style="font-size: 11px; color: var(--text-secondary);">
+                  Include word <strong style="color: var(--accent-red);">"fail"</strong> in URL to simulate failed automated test suites.
+                </span>
+              </div>
+
+              <div style="margin-top: 24px;">
+                <button type="submit" class="btn btn-primary" style="width: 100%;" :disabled="isProcessingAgentJob">
+                  <span v-if="isProcessingAgentJob">Processing Escrow...</span>
+                  <span v-else>🔒 Create & Fund ERC-8183 Job</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Right: Active Agentic Gigs & Simulation Pipeline -->
+          <div style="display: flex; flex-direction: column; gap: 24px;">
+            <div class="glass-panel" style="flex: 1;">
+              <h3 style="margin-bottom: 16px; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                🤖 Active Agentic Gigs ({{ agenticJobs.length }})
+              </h3>
+
+              <div v-if="agenticJobs.length === 0" style="text-align: center; padding: 40px 0; color: var(--text-secondary);">
+                No active agentic escrows found. Post an AI task on the left to start.
+              </div>
+
+              <div v-else style="display: flex; flex-direction: column; gap: 16px; max-height: 480px; overflow-y: auto; padding-right: 4px;">
+                <div v-for="job in agenticJobs" :key="job.id" class="card" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; background: rgba(255, 255, 255, 0.02);">
+                  <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                    <div>
+                      <h4 style="margin: 0; font-family: var(--font-display); font-size: 16px; color: var(--text-primary);">Job #{{ job.id }}</h4>
+                      <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">{{ job.repoUrl }}</div>
+                    </div>
+                    <span class="badge" :style="{
+                      backgroundColor: job.status === 'Completed' ? 'var(--accent-green)' : job.status === 'Rejected' ? 'var(--accent-red)' : 'var(--accent-purple)',
+                      color: '#fff',
+                      fontSize: '11px',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontWeight: '700'
+                    }">{{ job.status }}</span>
+                  </div>
+
+                  <div style="font-size: 13px; color: var(--text-secondary); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+                    <div>💰 Budget: <strong>{{ job.amount }} USDC</strong></div>
+                    <div>🔒 Staked Collateral: <strong>{{ (job.amount / 10).toFixed(2) }} USDC (10%)</strong></div>
+                    <div style="grid-column: span 2; font-family: monospace; word-break: break-all; font-size: 11px;">
+                      🤖 Provider: {{ job.freelancer }}
+                    </div>
+                  </div>
+
+                  <!-- Steps Simulation -->
+                  <div style="border-top: 1px dashed var(--border-color); padding-top: 12px; display: flex; flex-wrap: wrap; gap: 8px;">
+                    <!-- Step 1: Commit -->
+                    <button 
+                      @click="triggerAgentCommit(job.id)"
+                      class="btn btn-accent btn-small"
+                      style="padding: 6px 12px; font-size: 12px;"
+                      :disabled="job.status !== 'Funded' || isProcessingAgentJob"
+                    >
+                      Step 1: Sign & Commit (10% Stake)
+                    </button>
+
+                    <!-- Step 2: Submit work -->
+                    <button 
+                      @click="triggerAgentSubmit(job.id)"
+                      class="btn btn-accent btn-small"
+                      style="padding: 6px 12px; font-size: 12px;"
+                      :disabled="job.status !== 'Funded' || isProcessingAgentJob"
+                    >
+                      Step 2: Submit Work
+                    </button>
+
+                    <!-- Step 3: Trigger Oracle Verification -->
+                    <button 
+                      @click="triggerOracleVerification(job)"
+                      class="btn btn-primary btn-small"
+                      style="padding: 6px 12px; font-size: 12px;"
+                      :disabled="(job.status !== 'Submitted' && job.status !== 'Funded') || isVerifyingDeliverable"
+                    >
+                      Step 3: Run Oracle Tests
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom: Negotiation and Oracle logs console -->
+        <div class="glass-panel" style="margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+          <div>
+            <h4 style="margin-bottom: 12px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+              <span>💬 Agent Negotiation Console</span>
+            </h4>
+            <div style="background: #000; font-family: monospace; font-size: 12px; color: var(--accent-green); padding: 16px; border-radius: 6px; height: 180px; overflow-y: auto; border: 1px solid var(--border-color);">
+              <div v-for="(log, i) in agentNegotiationLogs" :key="i" style="margin-bottom: 6px;">
+                <span style="color: var(--text-secondary);">[{{ log.time }}]</span> {{ log.text }}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 style="margin-bottom: 12px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+              <span>🔍 Oracle Testing Unit Output</span>
+            </h4>
+            <div style="background: #000; font-family: monospace; font-size: 12px; color: #00ffcc; padding: 16px; border-radius: 6px; height: 180px; overflow-y: auto; border: 1px solid var(--border-color);">
+              <div v-if="oracleVerificationLogs.length === 0" style="color: var(--text-secondary); text-align: center; padding-top: 50px;">
+                Execute step 3 on an active job to trigger testing and linter evaluations.
+              </div>
+              <div v-else>
+                <div v-for="(log, i) in oracleVerificationLogs" :key="i" style="margin-bottom: 4px;">
+                  <span :style="{ color: log.startsWith('FAIL') || log.startsWith('Error') ? 'var(--accent-red)' : 'inherit' }">
+                    {{ log }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gateway Nanopayments (x402) Tab -->
+      <div v-else-if="currentTab === 'nanopay'" class="tab-content">
+        <div style="margin-bottom: 24px; text-align: center;">
+          <span class="badge" style="background-color: var(--accent-teal-dark); color: #fff; font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 4px 10px; border-radius: 20px;">Sub-Cent Streaming</span>
+          <h2 style="font-family: var(--font-display); font-size: 32px; color: var(--text-primary); margin-top: 8px; margin-bottom: 8px;">Gateway Nanopayments & x402 Protocol</h2>
+          <p style="color: var(--text-secondary); max-width: 700px; margin: 0 auto; font-size: 14px;">
+            Establish low-latency payment channels with Circle Gateway, authorizing sub-cent micropayments ($0.000001 resolution) for git events with zero gas overhead using HTTP-native 402 handshakes.
+          </p>
+        </div>
+
+        <div class="portal-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+          <!-- Left: Client Channel Manager & Deposit -->
+          <div class="glass-panel" style="display: flex; flex-direction: column; gap: 20px;">
+            <h3 style="color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <span>💳 Client Gateway Balance Channel</span>
+            </h3>
+            
+            <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); padding: 20px; display: flex; flex-direction: column; gap: 12px; align-items: center; text-align: center;">
+              <span style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">Unified Gateway Balance (Client)</span>
+              <div style="font-size: 40px; font-family: var(--font-display); font-weight: 800; color: var(--accent-teal);">
+                {{ gatewayBalance.toFixed(6) }} USDC
+              </div>
+              <span style="font-size: 11px; color: var(--text-secondary);">USDC deposited into Circle Gateway channel on Arc Testnet</span>
+            </div>
+
+            <form @submit.prevent="depositToGateway">
+              <div class="form-group">
+                <label class="form-label">Deposit Amount (USDC)</label>
+                <div style="display: flex; gap: 10px;">
+                  <input v-model.number="gatewayDepositAmount" type="number" step="1" min="1" class="form-input" required />
+                  <button type="submit" class="btn btn-primary" style="margin: 0; min-width: 150px;" :disabled="isProcessingGatewayDeposit">
+                    <span v-if="isProcessingGatewayDeposit">Depositing...</span>
+                    <span v-else>Deposit USDC</span>
+                  </button>
+                </div>
+                <span style="font-size: 11px; color: var(--text-secondary); margin-top: 6px; display: block;">
+                  Locks USDC tokens into the Gateway Wallet contract on-chain to back your off-chain sub-cent payments.
+                </span>
+              </div>
+            </form>
+          </div>
+
+          <!-- Right: Freelancer Earnings Stream & Settlement -->
+          <div class="glass-panel" style="display: flex; flex-direction: column; gap: 20px;">
+            <h3 style="color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <span>💸 Freelancer Micropayments Streamer</span>
+            </h3>
+            
+            <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); padding: 20px; display: flex; flex-direction: column; gap: 12px; align-items: center; text-align: center; position: relative; overflow: hidden;">
+              <div v-if="isStreamingEarningsActive" class="streaming-glow-effect"></div>
+              
+              <span style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
+                <span v-if="isStreamingEarningsActive" class="pulsing-live-dot"></span>
+                <span>Accumulated Micro-Earnings (Freelancer)</span>
+              </span>
+              
+              <!-- Realtime Counter -->
+              <div style="font-size: 40px; font-family: var(--font-display); font-weight: 800; color: var(--accent-green);">
+                {{ realtimeStreamingEarnings.toFixed(6) }} USDC
+              </div>
+              <span style="font-size: 11px; color: var(--text-secondary);">USDC accumulated instantly from continuous deliverables / Git actions</span>
+            </div>
+
+            <div>
+              <button @click="withdrawMicropayments" class="btn btn-accent" style="width: 100%;" :disabled="isProcessingGatewayWithdrawal || accumulatedMicropayments <= 0">
+                <span v-if="isProcessingGatewayWithdrawal">Withdrawing on Arc...</span>
+                <span v-else-if="accumulatedMicropayments <= 0">No Earnings to Settle</span>
+                <span v-else>Settle & Withdraw {{ accumulatedMicropayments.toFixed(6) }} USDC to Wallet</span>
+              </button>
+              <span style="font-size: 11px; color: var(--text-secondary); margin-top: 8px; display: block; text-align: center;">
+                Executes an instant, gasless on-chain mint/transfer from the Gateway to your main connected address.
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom section: x402 Challenge-Response Interactive Playground -->
+        <div class="glass-panel" style="margin-top: 24px; display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px;">
+          <div>
+            <h3 style="margin-bottom: 16px; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+              ⚡ HTTP-Native x402 Billing Simulator
+            </h3>
+            
+            <form @submit.prevent="runGitActionSimulation">
+              <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 16px; margin-bottom: 16px;">
+                <div class="form-group">
+                  <label class="form-label">Action Type</label>
+                  <select v-model="x402PlaygroundState.actionType" class="form-input">
+                    <option value="push_commit">Push Lines Commit</option>
+                    <option value="api_query">Continuous Linter Review</option>
+                    <option value="unit_test">Verify API Endpoint</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Units/Lines of Code</label>
+                  <input v-model.number="x402PlaygroundState.linesOfCode" type="number" min="1" max="100" class="form-input" required />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Deliverable / Code Summary</label>
+                <input v-model="x402PlaygroundState.description" type="text" class="form-input" required />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Recipient Freelancer Address</label>
+                <input v-model="x402PlaygroundState.freelancerAddress" type="text" class="form-input" placeholder="0x..." required />
+                <span style="font-size: 11px; color: var(--text-secondary);">
+                  Micropayments will automatically route to this freelancer's profile.
+                </span>
+              </div>
+
+              <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;" :disabled="isSimulatingGitAction || gatewayBalance < 0.05">
+                <span v-if="isSimulatingGitAction">Verifying Payment signature...</span>
+                <span v-else-if="gatewayBalance < 0.05">Insufficient Gateway Balance (Min 0.05 USDC)</span>
+                <span v-else>Submit Billed Git Action (0.05 USDC)</span>
+              </button>
+            </form>
+          </div>
+
+          <div>
+            <h3 style="margin-bottom: 16px; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <span>🌐 Web Server Console Log</span>
+            </h3>
+            <div style="background: #000; font-family: monospace; font-size: 12px; color: var(--accent-green); padding: 16px; border-radius: 6px; height: 320px; overflow-y: auto; border: 1px solid var(--border-color);">
+              <div v-for="(log, i) in x402PlaygroundLogs" :key="i" style="margin-bottom: 6px; line-height: 1.4;">
+                <span style="color: var(--text-secondary);">[{{ log.time }}]</span> {{ log.text }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       </div> <!-- Closes activeSection === 'app' -->
+
 
       <!-- ==================== 3. DOCUMENTATION SECTION ==================== -->
       <div v-else-if="activeSection === 'docs'" class="docs-container" style="display: grid; grid-template-columns: 240px 1fr; gap: 32px; align-items: start; margin-bottom: 60px;">
@@ -1587,6 +2096,43 @@
         </div>
       </div>
 
+      <!-- Appeal Dispute Modal Overlay -->
+      <div v-if="showAppealModal" class="wallet-modal-overlay" @click.self="showAppealModal = false">
+        <div class="wallet-modal-container" style="max-width: 440px;">
+          <div class="wallet-modal-header">
+            <span class="wallet-modal-title">Appeal Dispute Ruling</span>
+            <button class="wallet-modal-close" @click="showAppealModal = false">×</button>
+          </div>
+          <div class="wallet-modal-detail" style="padding: 24px; flex-direction: column; align-items: stretch;">
+            <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 20px;">
+              Appealing will lock the required appeal fee in the USYC Yield Vault, reopen the dispute for voting by a wider juror pool, and reset previous tier votes.
+            </p>
+            <div style="background: var(--bg-secondary); border: 2px solid var(--border-color); border-radius: var(--border-radius-sm); padding: 15px; margin-bottom: 24px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px;">
+                <span>Current Appeal Tier:</span>
+                <strong>Tier {{ jobsList.find(j => j.id === appealJobId)?.dispute?.appealTier || 0 }}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px;">
+                <span>New Appeal Tier:</span>
+                <strong>Tier {{ (jobsList.find(j => j.id === appealJobId)?.dispute?.appealTier || 0) + 1 }}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                <span>Required Appeal Fee:</span>
+                <strong style="color: var(--accent-magenta);">
+                  {{ (jobsList.find(j => j.id === appealJobId)?.dispute?.appealTier || 0) === 0 ? '100' : '200' }} USDC
+                </strong>
+              </div>
+            </div>
+            <div style="display: flex; gap: 12px; width: 100%;">
+              <button class="btn btn-secondary" style="flex: 1;" @click="showAppealModal = false">Cancel</button>
+              <button class="btn btn-accent" style="flex: 1;" @click="confirmAppeal" :disabled="isSubmitting">
+                Approve & Appeal
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Universal Centralized Modal Overlay -->
       <div v-if="activeModal" class="wallet-modal-overlay" @click.self="handleBackdropClick" :style="{ pointerEvents: activeModal.preventClose ? 'none' : 'auto' }">
         <div class="wallet-modal-container universal-modal-container" style="max-width: 440px;">
@@ -1785,11 +2331,18 @@ import { ref, onMounted, computed, onUnmounted } from 'vue';
 import { createPublicClient, createWalletClient, http, custom, parseUnits, formatUnits } from 'viem';
 import { 
   GIGMARKET_ESCROW_ABI, 
+  AGENT_ESCROW_8183_ABI,
   ERC20_ABI, 
   USDC_TOKEN_ADDRESS, 
   EURC_TOKEN_ADDRESS 
 } from './utils/contract';
 import { activeModal, closeModal, modals, handleError } from './utils/modals';
+import {
+  generateViewerKey,
+  encryptJobDetails,
+  decryptJobDetails,
+  generateBudgetProof
+} from './utils/crypto-privacy';
 import {
   circleUserWallet,
   circleSessionToken,
@@ -1825,6 +2378,252 @@ const currentTab = ref('client');
 const freelancerSubTab = ref('browse');
 const clientSubTab = ref('gigs');
 
+// Agentic / ERC-8183 state variables
+const newAgentJob = ref({
+  provider: '', // Default simulation provider or backend wallet
+  evaluator: '', // Evaluator/Oracle wallet address
+  amount: 50,
+  expiryDays: 2,
+  codeUrl: 'https://raw.githubusercontent.com/owner/repo/main/code.js',
+  repoUrl: 'github.com/agent-factory/erc8183-agent'
+});
+
+const activeAgentJobId = ref(null);
+const agentNegotiationLogs = ref([
+  { time: new Date().toLocaleTimeString(), text: 'System initialized. Ready for ERC-8183 Agentic Escrow flows.' }
+]);
+const oracleVerificationLogs = ref([]);
+const isProcessingAgentJob = ref(false);
+const isVerifyingDeliverable = ref(false);
+
+const agenticJobs = computed(() => {
+  return jobsList.value.filter(j => j.isAgentic || j.escrowType === 'ERC8183');
+});
+
+// Creates a new Agentic job using AgentEscrow8183 contract
+async function createAgentJob() {
+  if (!userAddress.value) {
+    modals.warning('Wallet Disconnected', 'Please connect your EVM wallet first to compile and fund new agentic jobs.');
+    return;
+  }
+
+  isProcessingAgentJob.value = true;
+  try {
+    const contractAddress = systemStatus.value.agentEscrowAddress;
+    if (!contractAddress) {
+      throw new Error('AgentEscrow8183 address is not configured on the server status.');
+    }
+
+    const publicClient = createPublicClient({
+      chain: arcTestnet,
+      transport: http(),
+    });
+
+    const web3Provider = window.ethereum;
+    if (!web3Provider) {
+      throw new Error('No web3 provider found (Metamask required for client transactions)');
+    }
+
+    const walletClient = createWalletClient({
+      account: userAddress.value,
+      chain: arcTestnet,
+      transport: custom(web3Provider),
+    });
+
+    const usdcUnits = parseUnits(newAgentJob.value.amount.toString(), 6);
+    const expiryTimestamp = Math.floor(Date.now() / 1000) + (newAgentJob.value.expiryDays * 24 * 60 * 60);
+
+    // 1. Approve USDC spend
+    modals.info('Approving USDC', 'Please sign the USDC approval transaction in your browser wallet.');
+    
+    const approveHash = await walletClient.writeContract({
+      address: USDC_TOKEN_ADDRESS,
+      abi: ERC20_ABI,
+      functionName: 'approve',
+      args: [contractAddress, usdcUnits],
+    });
+    
+    await publicClient.waitForTransactionReceipt({ hash: approveHash });
+    
+    // 2. Create Job
+    modals.info('Creating Job', 'Please confirm the job creation transaction.');
+    
+    const createHash = await walletClient.writeContract({
+      address: contractAddress,
+      abi: AGENT_ESCROW_8183_ABI,
+      functionName: 'createJob',
+      args: [
+        newAgentJob.value.provider || systemStatus.value.walletAddress,
+        newAgentJob.value.evaluator || systemStatus.value.walletAddress,
+        USDC_TOKEN_ADDRESS,
+        usdcUnits,
+        BigInt(expiryTimestamp)
+      ],
+    });
+
+    const createReceipt = await publicClient.waitForTransactionReceipt({ hash: createHash });
+    console.log('Job created receipt:', createReceipt);
+
+    // Fetch jobCount
+    const jobCount = await publicClient.readContract({
+      address: contractAddress,
+      abi: AGENT_ESCROW_8183_ABI,
+      functionName: 'jobCount',
+    });
+    const jobId = Number(jobCount);
+
+    // 3. Fund Job
+    modals.info('Funding Job', 'Confirm funding the escrow budget.');
+
+    const fundHash = await walletClient.writeContract({
+      address: contractAddress,
+      abi: AGENT_ESCROW_8183_ABI,
+      functionName: 'fundJob',
+      args: [BigInt(jobId)],
+    });
+    await publicClient.waitForTransactionReceipt({ hash: fundHash });
+
+    // 4. Save to local DB
+    const newJobDb = {
+      id: jobId.toString(),
+      title: `AI Autonomous Task for ${newAgentJob.value.repoUrl}`,
+      description: `Staked autonomous execution with deliverable verification on ${newAgentJob.value.repoUrl}`,
+      budget: newAgentJob.value.amount,
+      repoUrl: newAgentJob.value.repoUrl,
+      codeUrl: newAgentJob.value.codeUrl,
+      isAgentic: true,
+      escrowType: 'ERC8183',
+      status: 'Funded',
+      freelancer: newAgentJob.value.provider || systemStatus.value.walletAddress,
+      client: userAddress.value
+    };
+
+    await $fetch('/api/jobs', {
+      method: 'POST',
+      body: newJobDb,
+    });
+
+    agentNegotiationLogs.value.unshift({
+      time: new Date().toLocaleTimeString(),
+      text: `[Client] Created & funded job #${jobId} targeting AI Agent. Escrow is locked.`
+    });
+
+    modals.success('Agent Job Created', `Successfully funded and launched ERC-8183 job #${jobId}!`);
+    await loadJobsFromLocalDb();
+  } catch (error) {
+    console.error('Error creating agentic job:', error);
+    modals.error('Job Creation Failed', error.message || error);
+  } finally {
+    isProcessingAgentJob.value = false;
+  }
+}
+
+// Simulates the agent joining, signing commitment, and staking 10% collateral
+async function triggerAgentCommit(jobId) {
+  isProcessingAgentJob.value = true;
+  try {
+    agentNegotiationLogs.value.unshift({
+      time: new Date().toLocaleTimeString(),
+      text: `[Agent] Detected job #${jobId}. Preparing cryptographic commitment...`
+    });
+
+    const res = await $fetch('/api/agent-action', {
+      method: 'POST',
+      body: { jobId, action: 'commit' }
+    });
+
+    if (res.error) throw new Error(res.error);
+
+    agentNegotiationLogs.value.unshift({
+      time: new Date().toLocaleTimeString(),
+      text: `[Agent] Successfully signed commitment (Sig: ${res.signature.slice(0, 16)}...) and staked 10% USDC collateral. Tx: ${res.txHash.slice(0, 16)}...`
+    });
+
+    modals.success('Agent Committed', `AI Agent committed to Job #${jobId} and staked collateral.`);
+    await loadJobsFromLocalDb();
+  } catch (error) {
+    console.error('Agent commitment failed:', error);
+    modals.error('Agent Commitment Failed', error.message || error);
+  } finally {
+    isProcessingAgentJob.value = false;
+  }
+}
+
+// Simulates the agent submitting completed work deliverable
+async function triggerAgentSubmit(jobId) {
+  isProcessingAgentJob.value = true;
+  try {
+    agentNegotiationLogs.value.unshift({
+      time: new Date().toLocaleTimeString(),
+      text: `[Agent] Submitting completed deliverables...`
+    });
+
+    const deliverableHash = '0x' + Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join('');
+
+    const res = await $fetch('/api/agent-action', {
+      method: 'POST',
+      body: { 
+        jobId, 
+        action: 'submit',
+        deliverableHash
+      }
+    });
+
+    if (res.error) throw new Error(res.error);
+
+    agentNegotiationLogs.value.unshift({
+      time: new Date().toLocaleTimeString(),
+      text: `[Agent] Deliverable hash submitted: ${res.deliverableHash.slice(0, 16)}... on-chain. Tx: ${res.txHash.slice(0, 16)}...`
+    });
+
+    modals.success('Deliverable Submitted', `AI Agent submitted deliverables for Job #${jobId}.`);
+    await loadJobsFromLocalDb();
+  } catch (error) {
+    console.error('Agent work submission failed:', error);
+    modals.error('Submission Failed', error.message || error);
+  } finally {
+    isProcessingAgentJob.value = false;
+  }
+}
+
+// Triggers testing suite oracle verification
+async function triggerOracleVerification(job) {
+  isVerifyingDeliverable.value = true;
+  oracleVerificationLogs.value = [];
+  try {
+    agentNegotiationLogs.value.unshift({
+      time: new Date().toLocaleTimeString(),
+      text: `[Oracle] Launching automated unit tests for job #${job.id}...`
+    });
+
+    const res = await $fetch('/api/verify-deliverable', {
+      method: 'POST',
+      body: {
+        jobId: job.id,
+        deliverableHash: job.deliverableHash || '0x' + '12'.repeat(32),
+        codeUrl: job.codeUrl || newAgentJob.value.codeUrl
+      }
+    });
+
+    if (res.error) throw new Error(res.error);
+
+    oracleVerificationLogs.value = res.logs || [];
+    
+    agentNegotiationLogs.value.unshift({
+      time: new Date().toLocaleTimeString(),
+      text: `[Oracle] Verification complete. Outcome: ${res.testSuitePassed ? 'PASS' : 'FAIL'}. Payout released. Tx: ${res.txHash.slice(0, 16)}...`
+    });
+
+    modals.success('Verification Complete', `Oracle evaluated job #${job.id}: Result ${res.targetStatus}.`);
+    await loadJobsFromLocalDb();
+  } catch (error) {
+    console.error('Oracle verification failed:', error);
+    modals.error('Verification Failed', error.message || error);
+  } finally {
+    isVerifyingDeliverable.value = false;
+  }
+}
+
 const totalFreelancerYieldDistributed = computed(() => {
   return jobsList.value
     .filter(j => j.freelancer?.toLowerCase() === userAddress.value?.toLowerCase())
@@ -1852,6 +2651,254 @@ const totalClientYieldAccruing = computed(() => {
 const totalPlatformYieldRevenue = computed(() => {
   return jobsList.value.reduce((sum, j) => sum + (j.yieldDistributed || 0) * 0.2, 0);
 });
+
+// Phase 9: Gateway Nanopayments & x402 state variables
+const gatewayDepositAmount = ref(10.0);
+const gatewayBalance = ref(0.0);
+const accumulatedMicropayments = ref(0.0);
+const realtimeStreamingEarnings = ref(0.0);
+const isStreamingEarningsActive = ref(false);
+const isProcessingGatewayDeposit = ref(false);
+const isProcessingGatewayWithdrawal = ref(false);
+const isSimulatingGitAction = ref(false);
+
+const x402PlaygroundState = ref({
+  linesOfCode: 20,
+  actionType: 'push_commit',
+  description: 'Updated landing page visuals with Outfit font and premium gradients',
+  freelancerAddress: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' // Account 2 or simulated expert
+});
+
+const x402PlaygroundLogs = ref([
+  { time: new Date().toLocaleTimeString(), text: 'x402 API playground ready. Connect wallet to sign challenge handshakes.' }
+]);
+
+function addPlaygroundLog(text) {
+  x402PlaygroundLogs.value.unshift({
+    time: new Date().toLocaleTimeString(),
+    text
+  });
+}
+
+// Watch userAddress to refresh profiles
+watch(userAddress, (newVal) => {
+  if (newVal) {
+    refreshGatewayProfile();
+  } else {
+    gatewayBalance.value = 0.0;
+    accumulatedMicropayments.value = 0.0;
+  }
+});
+
+async function refreshGatewayProfile() {
+  if (!userAddress.value) return;
+  try {
+    const res = await $fetch('/api/nanopay-settle', {
+      method: 'POST',
+      body: {
+        action: 'get_profile',
+        walletAddress: userAddress.value
+      }
+    });
+    if (res.success && res.profile) {
+      gatewayBalance.value = res.profile.gatewayBalance || 0.0;
+      accumulatedMicropayments.value = res.profile.accumulatedMicropayments || 0.0;
+      if (!isStreamingEarningsActive.value) {
+        realtimeStreamingEarnings.value = res.profile.accumulatedMicropayments || 0.0;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load gateway profile:', error);
+  }
+}
+
+async function depositToGateway() {
+  if (!userAddress.value) {
+    modals.warning('Wallet Disconnected', 'Please connect your wallet first.');
+    return;
+  }
+  isProcessingGatewayDeposit.value = true;
+  try {
+    const res = await $fetch('/api/nanopay-settle', {
+      method: 'POST',
+      body: {
+        action: 'deposit',
+        walletAddress: userAddress.value,
+        amount: gatewayDepositAmount.value
+      }
+    });
+    if (res.success) {
+      modals.success('Deposit Successful', res.message);
+      await refreshGatewayProfile();
+      await fetchUserBlockchainDetails();
+    }
+  } catch (error) {
+    modals.error('Deposit Failed', error.data?.error || error.message);
+  } finally {
+    isProcessingGatewayDeposit.value = false;
+  }
+}
+
+async function withdrawMicropayments() {
+  if (!userAddress.value) {
+    modals.warning('Wallet Disconnected', 'Please connect your wallet first.');
+    return;
+  }
+  isProcessingGatewayWithdrawal.value = true;
+  try {
+    const res = await $fetch('/api/nanopay-settle', {
+      method: 'POST',
+      body: {
+        action: 'withdraw',
+        walletAddress: userAddress.value
+      }
+    });
+    if (res.success) {
+      modals.success('Withdrawal Complete', `${res.message}\nTx Hash: ${res.txHash}`);
+      await refreshGatewayProfile();
+      await fetchUserBlockchainDetails();
+    }
+  } catch (error) {
+    modals.error('Withdrawal Failed', error.data?.error || error.message);
+  } finally {
+    isProcessingGatewayWithdrawal.value = false;
+  }
+}
+
+let streamingInterval = null;
+function startStreamingVisualizer() {
+  if (streamingInterval) clearInterval(streamingInterval);
+  isStreamingEarningsActive.value = true;
+  
+  // Set real-time streaming to accumulated micro-payments and stream up
+  realtimeStreamingEarnings.value = accumulatedMicropayments.value;
+  
+  streamingInterval = setInterval(() => {
+    // Increment by a tiny sub-cent decimal (e.g. $0.0001 per tick)
+    realtimeStreamingEarnings.value = parseFloat((realtimeStreamingEarnings.value + 0.0001).toFixed(6));
+  }, 100);
+
+  // Stop after 8 seconds
+  setTimeout(() => {
+    if (streamingInterval) {
+      clearInterval(streamingInterval);
+      streamingInterval = null;
+    }
+    isStreamingEarningsActive.value = false;
+    refreshGatewayProfile();
+  }, 8000);
+}
+
+async function runGitActionSimulation() {
+  if (!userAddress.value) {
+    modals.warning('Wallet Disconnected', 'Please connect your wallet first.');
+    return;
+  }
+  
+  isSimulatingGitAction.value = true;
+  x402PlaygroundLogs.value = []; // Reset logs
+  addPlaygroundLog('🚀 Initiating Git push action request...');
+  
+  try {
+    // 1. Initial Request (expected to receive 402 Challenge)
+    let response;
+    let errorResponse = null;
+    
+    try {
+      response = await $fetch.raw('/api/git-action', {
+        method: 'POST',
+        body: {
+          linesOfCode: x402PlaygroundState.value.linesOfCode,
+          actionType: x402PlaygroundState.value.actionType,
+          description: x402PlaygroundState.value.description
+        },
+        query: {
+          freelancerAddress: x402PlaygroundState.value.freelancerAddress
+        }
+      });
+    } catch (fetchErr) {
+      if (fetchErr.status === 402) {
+        errorResponse = fetchErr;
+      } else {
+        throw fetchErr;
+      }
+    }
+    
+    if (!errorResponse) {
+      addPlaygroundLog('⚠️ Unexpected HTTP 200: Handshake was already pre-paid.');
+      isSimulatingGitAction.value = false;
+      return;
+    }
+    
+    // 2. Parse 402 Headers
+    const headers = errorResponse.headers;
+    const challenge = headers.get('x-402-challenge');
+    const price = headers.get('x-402-price') || '0.05';
+    const recipient = headers.get('x-402-recipient');
+    const token = headers.get('x-402-token');
+    
+    addPlaygroundLog(`🛑 Received HTTP 402: Payment Required.`);
+    addPlaygroundLog(`🏷️ Billed Price: ${price} USDC`);
+    addPlaygroundLog(`🔗 Challenge: ${challenge}`);
+    addPlaygroundLog(`✍️ Requesting cryptographic signature from client wallet...`);
+    
+    // 3. Cryptographically Sign challenge
+    const web3Provider = window.ethereum;
+    if (!web3Provider) {
+      throw new Error('No compatible EIP-1193 wallet provider found for signing.');
+    }
+    
+    const walletClient = createWalletClient({
+      account: userAddress.value,
+      chain: arcTestnet,
+      transport: custom(web3Provider),
+    });
+    
+    const signature = await walletClient.signMessage({
+      message: challenge
+    });
+    
+    addPlaygroundLog(`🔑 Signature generated: ${signature.slice(0, 24)}...`);
+    addPlaygroundLog(`🔄 Resubmitting request with payment authorization headers...`);
+    
+    // 4. Submit Resubmission with x402 payment headers
+    const successRes = await $fetch('/api/git-action', {
+      method: 'POST',
+      headers: {
+        'x-402-payment-signature': signature,
+        'x-402-client-address': userAddress.value,
+        'x-402-freelancer-address': x402PlaygroundState.value.freelancerAddress,
+        'x-402-challenge': challenge,
+        'x-402-amount': price
+      },
+      body: {
+        linesOfCode: x402PlaygroundState.value.linesOfCode,
+        actionType: x402PlaygroundState.value.actionType,
+        description: x402PlaygroundState.value.description
+      }
+    });
+    
+    if (successRes.success) {
+      addPlaygroundLog(`🎉 Success! HTTP 200: Billing Authorized.`);
+      addPlaygroundLog(`💰 Billed: ${successRes.billing.billedAmount} USDC`);
+      addPlaygroundLog(`📉 Client Remaining Gateway Balance: ${successRes.billing.clientRemainingGatewayBalance} USDC`);
+      addPlaygroundLog(`📈 Freelancer Accumulated Earnings: ${successRes.billing.freelancerAccumulatedEarnings} USDC`);
+      
+      gatewayBalance.value = successRes.billing.clientRemainingGatewayBalance;
+      accumulatedMicropayments.value = successRes.billing.freelancerAccumulatedEarnings;
+      
+      // Trigger live streaming animation visual wow
+      startStreamingVisualizer();
+      modals.success('Nanopayment Success', `Authorized micropayment of ${price} USDC for Git Push action.`);
+    }
+  } catch (err) {
+    console.error('x402 pipeline simulation error:', err);
+    addPlaygroundLog(`❌ Error: ${err.data?.message || err.message}`);
+    modals.error('x402 Pipeline Error', err.data?.message || err.message);
+  } finally {
+    isSimulatingGitAction.value = false;
+  }
+}
 
 // MVP Startup Page Architecture
 const activeSection = ref('home');
@@ -1919,10 +2966,45 @@ function submitContact() {
   };
 }
 
+const viewerKeysInput = ref({});
+
+async function decryptJob(job) {
+  const key = viewerKeysInput.value[job.id];
+  if (!key || !key.startsWith('0x') || key.length !== 66) {
+    modals.warning('Invalid Key', 'Please enter a valid 256-bit hex viewer key starting with 0x.');
+    return;
+  }
+  try {
+    const decrypted = await decryptJobDetails(job.encryptedDetails, key);
+    job.decrypted = decrypted;
+    job.title = decrypted.title;
+    job.description = decrypted.description;
+    job.repoUrl = decrypted.repoUrl;
+    job.budget = decrypted.budget;
+    job.milestones = decrypted.milestones;
+    
+    // Save to local storage
+    const storedKeys = JSON.parse(localStorage.getItem('viewer_keys') || '{}');
+    storedKeys[job.id] = key;
+    localStorage.setItem('viewer_keys', JSON.stringify(storedKeys));
+
+    modals.success('Decryption Successful', 'Job details decrypted successfully using the provided Viewer Key!');
+  } catch (e) {
+    console.error('Decryption failed:', e);
+    modals.error('Decryption Failed', 'Invalid viewer key or corrupted data.');
+  }
+}
+
 // States
 const userAddress = ref('');
 const freelancerReputation = ref(0);
 const userIsJuror = ref(false);
+const jurorReputationScore = ref(100);
+const jurorActiveStake = ref(0);
+const jurorHistory = ref([]);
+const platformOwner = ref('');
+const showAppealModal = ref(false);
+const appealJobId = ref(null);
 const systemStatus = ref({});
 const isSystemLoading = ref(true);
 const loadingJobs = ref(true);
@@ -2177,7 +3259,8 @@ const newJob = ref({
   repoUrl: '',
   budget: 100,
   milestonesCount: 1,
-  milestones: [{ title: 'Milestone 1', budget: 100 }]
+  milestones: [{ title: 'Milestone 1', budget: 100 }],
+  isPrivate: false
 });
 
 const swapForm = ref({
@@ -2206,7 +3289,8 @@ const arcTestnet = {
 const openJobs = computed(() => jobsList.value.filter(j => j.status === 'Created'));
 const clientJobs = computed(() => jobsList.value.filter(j => j.client.toLowerCase() === userAddress.value.toLowerCase()));
 const joinedJobs = computed(() => jobsList.value.filter(j => j.freelancer.toLowerCase() === userAddress.value.toLowerCase()));
-const disputedJobs = computed(() => jobsList.value.filter(j => j.status === 'Disputed'));
+const disputedJobs = computed(() => jobsList.value.filter(j => j.status === 'Disputed' || j.status === 'AppealPending'));
+const isOwner = computed(() => userAddress.value && platformOwner.value && userAddress.value.toLowerCase() === platformOwner.value.toLowerCase());
 
 // On Mount
 onMounted(async () => {
@@ -2357,6 +3441,10 @@ async function fetchSystemStatus() {
   try {
     const data = await $fetch('/api/circle-status');
     systemStatus.value = data;
+    if (data && data.walletAddress) {
+      newAgentJob.value.provider = data.walletAddress;
+      newAgentJob.value.evaluator = data.walletAddress;
+    }
   } catch (e) {
     console.error('Error fetching system status:', e);
   } finally {
@@ -2369,6 +3457,27 @@ async function loadJobsFromLocalDb() {
   loadingJobs.value = true;
   try {
     const jobs = await $fetch('/api/jobs');
+    
+    const storedKeys = JSON.parse(localStorage.getItem('viewer_keys') || '{}');
+    for (const job of jobs) {
+      if (job.isPrivate && job.encryptedDetails) {
+        const key = storedKeys[job.id];
+        if (key) {
+          try {
+            const decrypted = await decryptJobDetails(job.encryptedDetails, key);
+            job.decrypted = decrypted;
+            job.title = decrypted.title;
+            job.description = decrypted.description;
+            job.repoUrl = decrypted.repoUrl;
+            job.budget = decrypted.budget;
+            job.milestones = decrypted.milestones;
+          } catch (e) {
+            console.warn(`Failed to auto-decrypt job #${job.id}:`, e);
+          }
+        }
+      }
+    }
+
     jobsList.value = jobs;
     
     // Auto populate simulated milestone selections
@@ -2376,8 +3485,8 @@ async function loadJobsFromLocalDb() {
       simulatedMilestoneIndex.value[job.id] = 0;
       isSimulating.value[job.id] = false;
       
-      // Load active dispute stands if disputed
-      if (job.status === 'Disputed') {
+      // Load active dispute stands if disputed or appeal pending
+      if (job.status === 'Disputed' || job.status === 'AppealPending') {
         fetchDisputeVotesStanding(job.id);
       }
     });
@@ -2418,6 +3527,33 @@ async function fetchUserBlockchainDetails() {
     });
     userIsJuror.value = isJurorVal;
 
+    // Fetch Juror Reputation
+    if (isJurorVal) {
+      try {
+        const jurorRep = await publicClient.readContract({
+          address: contractAddress,
+          abi: GIGMARKET_ESCROW_ABI,
+          functionName: 'jurorReputation',
+          args: [userAddress.value]
+        });
+        jurorReputationScore.value = Number(jurorRep) === 0 ? 100 : Number(jurorRep);
+      } catch (jurorRepErr) {
+        console.warn('Failed to read juror reputation:', jurorRepErr);
+      }
+    }
+
+    // Fetch Contract Owner
+    try {
+      const ownerVal = await publicClient.readContract({
+        address: contractAddress,
+        abi: GIGMARKET_ESCROW_ABI,
+        functionName: 'owner'
+      });
+      platformOwner.value = ownerVal;
+    } catch (ownerErr) {
+      console.warn('Failed to read contract owner:', ownerErr);
+    }
+
     // Fetch USDC Balance
     try {
       const usdcBal = await publicClient.readContract({
@@ -2443,10 +3579,25 @@ async function fetchUserBlockchainDetails() {
     } catch (err) {
       console.warn('Failed to read EURC balance:', err);
     }
+
+    // Fetch Profile from backend to load juror stakes and history
+    try {
+      const statusData = await $fetch(`/api/circle-status?walletAddress=${userAddress.value}`);
+      if (statusData && statusData.profile) {
+        jurorActiveStake.value = statusData.profile.jurorStakes || 0;
+        jurorHistory.value = statusData.profile.votingHistory || [];
+      }
+    } catch (profileErr) {
+      console.warn('Failed to load user profile details:', profileErr);
+    }
+    
+    // Fetch Gateway Nanopayment Profile
+    await refreshGatewayProfile();
   } catch (e) {
     console.error('Error reading blockchain profile:', e);
   }
 }
+
 
 // Get dispute votes details
 async function fetchDisputeVotesStanding(jobId) {
@@ -2558,6 +3709,186 @@ async function createGig() {
   }
 
   const contractAddress = systemStatus.value.contractAddress;
+  const isPrivateMode = newJob.value.isPrivate;
+
+  if (isPrivateMode && isSplitMode) {
+    modals.warning('Feature Conflict', 'Privacy features and multi-party splits cannot be enabled simultaneously.');
+    return;
+  }
+
+  if (isPrivateMode && fundingMethod.value === 'cross-chain') {
+    modals.warning('Feature Conflict', 'Cross-chain deposits via CCTP do not support confidential private transactions in the current phase.');
+    return;
+  }
+
+  // --- PRIVATE TRANSACTION GENERATION ---
+  if (isPrivateMode) {
+    isSubmitting.value = true;
+    modals.loading('Preparing Confidential Escrow', 'Generating Viewer Key and compiling Zero-Knowledge Proof payload locally...');
+
+    let viewerKey = '';
+    let encryptedDetails = null;
+    let commitment = '0x' + '00'.repeat(32);
+    let proof = '0x';
+    const budgetAmountUnits = parseUnits(newJob.value.budget.toString(), 6);
+
+    try {
+      viewerKey = generateViewerKey();
+      const sensitivePayload = {
+        title: newJob.value.title,
+        description: newJob.value.description,
+        repoUrl: newJob.value.repoUrl,
+        budget: newJob.value.budget,
+        milestones: newJob.value.milestones.map(m => ({
+          title: m.title,
+          budget: m.budget,
+          completed: false,
+          approved: false
+        }))
+      };
+      encryptedDetails = await encryptJobDetails(sensitivePayload, viewerKey);
+      const proofRes = generateBudgetProof(Number(budgetAmountUnits));
+      commitment = proofRes.commitment;
+      proof = proofRes.proof;
+    } catch (err) {
+      console.error('Failed to generate privacy parameters:', err);
+      closeModal();
+      modals.error('ZKP Proof Error', 'Failed to generate confidential keys or range proof.');
+      isSubmitting.value = false;
+      return;
+    }
+
+    try {
+      let createTxHash = '';
+      if (circleUserWallet.value) {
+        closeModal();
+        modals.loading('Authorizing USDC Budget', 'Step 1 of 2: Authorizing USDC budget allocation. Processing (Gasless Sponsored Transaction)...');
+        await executeSponsoredTransaction({
+          walletId: circleUserWallet.value.id,
+          contractAddress: USDC_TOKEN_ADDRESS,
+          abiFunctionSignature: 'approve(address,uint256)',
+          abiParameters: [contractAddress, budgetAmountUnits.toString()],
+          userToken: circleSessionToken.value,
+          userAddress: userAddress.value,
+          isSimulation: isSimulationMode.value,
+          executeChallengeFn: executeChallenge
+        });
+
+        closeModal();
+        modals.loading('Creating Private Job', 'Step 2 of 2: Depositing budget and creating confidential job (Gasless Sponsored Transaction)...');
+        const createRes = await executeSponsoredTransaction({
+          walletId: circleUserWallet.value.id,
+          contractAddress: contractAddress,
+          abiFunctionSignature: 'createPrivateJob(bytes32,bytes,string,uint256)',
+          abiParameters: [
+            commitment,
+            proof,
+            JSON.stringify(encryptedDetails),
+            budgetAmountUnits.toString()
+          ],
+          userToken: circleSessionToken.value,
+          userAddress: userAddress.value,
+          isSimulation: isSimulationMode.value,
+          executeChallengeFn: executeChallenge
+        });
+        createTxHash = createRes.txHash || 'Pending';
+      } else {
+        const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
+        const walletClient = createWalletClient({
+          account: userAddress.value,
+          chain: arcTestnet,
+          transport: custom(window.ethereum)
+        });
+
+        const approveTx = await walletClient.writeContract({
+          address: USDC_TOKEN_ADDRESS,
+          abi: ERC20_ABI,
+          functionName: 'approve',
+          args: [contractAddress, budgetAmountUnits]
+        });
+        closeModal();
+        modals.txPending(approveTx, 'Validating USDC allowance authorization on-chain. Please wait...');
+        await publicClient.waitForTransactionReceipt({ hash: approveTx });
+
+        closeModal();
+        modals.loading('Creating Private Job', 'Confirm the private job creation signature request in your wallet...');
+        const createTx = await walletClient.writeContract({
+          address: contractAddress,
+          abi: GIGMARKET_ESCROW_ABI,
+          functionName: 'createPrivateJob',
+          args: [commitment, proof, JSON.stringify(encryptedDetails), budgetAmountUnits]
+        });
+        closeModal();
+        modals.txPending(createTx, 'Publishing confidential escrow and verifying ZKP. Awaiting block receipt...');
+        await publicClient.waitForTransactionReceipt({ hash: createTx });
+        createTxHash = createTx;
+      }
+
+      let jobIdVal = 1;
+      if (!isSimulationMode.value) {
+        const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
+        const jobCount = await publicClient.readContract({
+          address: contractAddress,
+          abi: GIGMARKET_ESCROW_ABI,
+          functionName: 'jobCount'
+        });
+        jobIdVal = parseInt(jobCount.toString());
+      } else {
+        jobIdVal = jobsList.value.length + 1;
+      }
+
+      const newJobDb = {
+        id: jobIdVal,
+        title: 'CONFIDENTIAL',
+        description: 'CONFIDENTIAL',
+        repoUrl: 'CONFIDENTIAL',
+        budget: 0,
+        requiredStake: calculateJobRequiredStake(newJob.value.budget),
+        freelancerStake: '0',
+        client: userAddress.value,
+        freelancer: '0x0000000000000000000000000000000000000000',
+        status: 'Created',
+        currentMilestone: 0,
+        fundingMethod: 'arc',
+        isPrivate: true,
+        encryptedDetails: encryptedDetails,
+        milestones: newJob.value.milestones.map(m => ({
+          title: 'CONFIDENTIAL',
+          budget: 0,
+          completed: false,
+          approved: false,
+          txHash: createTxHash
+        }))
+      };
+
+      const storedKeys = JSON.parse(localStorage.getItem('viewer_keys') || '{}');
+      storedKeys[jobIdVal] = viewerKey;
+      localStorage.setItem('viewer_keys', JSON.stringify(storedKeys));
+
+      await $fetch('/api/jobs', { method: 'POST', body: newJobDb });
+
+      closeModal();
+      modals.success(
+        'Confidential Job Created!',
+        `Job #${jobIdVal} is now live.\n\nViewer Key (keep this secure for decryption & auditing):\n${viewerKey}`
+      );
+      await loadJobsFromLocalDb();
+
+      newJob.value.title = '';
+      newJob.value.description = '';
+      newJob.value.repoUrl = '';
+      newJob.value.isPrivate = false;
+      enableSplits.value = false;
+    } catch (e) {
+      console.error('Confidential job posting failed:', e);
+      closeModal();
+      modals.error('Job Posting Failed', e.message || 'Transaction failed.');
+    } finally {
+      isSubmitting.value = false;
+    }
+    return;
+  }
+
   const usdcUnits = parseUnits(newJob.value.budget.toString(), 6);
   const milestoneBudgets = newJob.value.milestones.map(m => parseUnits(m.budget.toString(), 6));
   const milestoneTitles = newJob.value.milestones.map(m => m.title);
@@ -2930,7 +4261,118 @@ async function joinGig(job) {
     modals.warning('Wallet Disconnected', 'Please connect your EVM wallet first to join projects.');
     return;
   }
-  
+
+  const isPrivateMode = job.isPrivate;
+
+  if (isPrivateMode) {
+    isSubmitting.value = true;
+    const requiredStakeVal = calculateJobRequiredStake(job.budget || 0);
+    const stakeUnits = parseUnits(requiredStakeVal, 6);
+    const contractAddress = systemStatus.value.contractAddress;
+
+    let stakeCommitment = '0x' + '00'.repeat(32);
+    let stakeProof = '0x';
+    if (stakeUnits > 0n) {
+      modals.loading('Preparing Confidential Collateral', 'Generating ZKP proof for required stake collateral...');
+      try {
+        const proofRes = generateBudgetProof(Number(stakeUnits));
+        stakeCommitment = proofRes.commitment;
+        stakeProof = proofRes.proof;
+      } catch (err) {
+        console.error('Failed to generate privacy parameters for stake:', err);
+        closeModal();
+        modals.error('ZKP Proof Error', 'Failed to generate ZKP proof for stake.');
+        isSubmitting.value = false;
+        return;
+      }
+    }
+
+    try {
+      if (circleUserWallet.value) {
+        if (stakeUnits > 0n) {
+          closeModal();
+          modals.loading('Preparing Collateral Stake', `Staking requirement: ${requiredStakeVal} USDC. Processing (Gasless Sponsored Transaction)...`);
+          await executeSponsoredTransaction({
+            walletId: circleUserWallet.value.id,
+            contractAddress: USDC_TOKEN_ADDRESS,
+            abiFunctionSignature: 'approve(address,uint256)',
+            abiParameters: [contractAddress, stakeUnits.toString()],
+            userToken: circleSessionToken.value,
+            userAddress: userAddress.value,
+            isSimulation: isSimulationMode.value,
+            executeChallengeFn: executeChallenge
+          });
+        }
+
+        closeModal();
+        modals.loading('Joining Private Job', 'Registering address securely as confidential freelancer (Gasless Sponsored Transaction)...');
+        await executeSponsoredTransaction({
+          walletId: circleUserWallet.value.id,
+          contractAddress: contractAddress,
+          abiFunctionSignature: 'joinPrivateJob(uint256,uint256,bytes32,bytes)',
+          abiParameters: [job.id.toString(), stakeUnits.toString(), stakeCommitment, stakeProof],
+          userToken: circleSessionToken.value,
+          userAddress: userAddress.value,
+          isSimulation: isSimulationMode.value,
+          executeChallengeFn: executeChallenge
+        });
+      } else {
+        const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
+        const walletClient = createWalletClient({
+          account: userAddress.value,
+          chain: arcTestnet,
+          transport: custom(window.ethereum)
+        });
+
+        if (stakeUnits > 0n) {
+          const approveTx = await walletClient.writeContract({
+            address: USDC_TOKEN_ADDRESS,
+            abi: ERC20_ABI,
+            functionName: 'approve',
+            args: [contractAddress, stakeUnits]
+          });
+          closeModal();
+          modals.txPending(approveTx, 'Validating collateral stake authorization on-chain. Please wait...');
+          await publicClient.waitForTransactionReceipt({ hash: approveTx });
+        }
+
+        closeModal();
+        modals.loading('Joining Private Job', 'Confirm private job joining signature request in your wallet...');
+        const joinTx = await walletClient.writeContract({
+          address: contractAddress,
+          abi: GIGMARKET_ESCROW_ABI,
+          functionName: 'joinPrivateJob',
+          args: [BigInt(job.id), stakeUnits, stakeCommitment, stakeProof]
+        });
+        closeModal();
+        modals.txPending(joinTx, 'Registering confidential freelancer address and staking collateral. Awaiting block receipt...');
+        await publicClient.waitForTransactionReceipt({ hash: joinTx });
+      }
+
+      const updatedJob = {
+        ...job,
+        status: 'Active',
+        freelancer: userAddress.value,
+        requiredStake: requiredStakeVal,
+        freelancerStake: requiredStakeVal
+      };
+
+      await $fetch('/api/jobs', { method: 'POST', body: updatedJob });
+
+      closeModal();
+      modals.success('Joined Private Project Successfully!', `You have joined Job #${job.id} as active freelancer! Staked collateral amount: ${requiredStakeVal} USDC.`);
+      await loadJobsFromLocalDb();
+      await fetchUserBlockchainDetails();
+    } catch (e) {
+      console.error('Circle joining private gig failed:', e);
+      closeModal();
+      modals.error('Failed to Join Project', e.message || 'Circle transaction failed.');
+    } finally {
+      isSubmitting.value = false;
+    }
+    return;
+  }
+
   const config = getJoinSplitConfig(job.id);
   let isSplitMode = config.enable;
   let recipients = [];
@@ -3099,7 +4541,110 @@ async function payoutMilestone(jobId, milestoneIndex) {
     return;
   }
 
+  const job = jobsList.value.find(j => j.id === jobId);
+  if (!job) {
+    modals.error('Job Not Found', `Failed to find job with ID #${jobId}`);
+    return;
+  }
+  const isPrivateMode = job.isPrivate;
   const contractAddress = systemStatus.value.contractAddress;
+
+  if (isPrivateMode) {
+    isSubmitting.value = true;
+    modals.loading('Preparing Private Milestone Release', 'Generating payout cryptographic proof & commitments...');
+
+    const milBudget = job.milestones[milestoneIndex].budget;
+    const payoutUnits = parseUnits(milBudget.toString(), 6);
+    const isLastMilestone = (milestoneIndex + 1 >= job.milestones.length);
+
+    let payoutCommitment = '0x' + '00'.repeat(32);
+    let payoutProof = '0x';
+
+    try {
+      const proofRes = generateBudgetProof(Number(payoutUnits));
+      payoutCommitment = proofRes.commitment;
+      payoutProof = proofRes.proof;
+    } catch (err) {
+      console.error('Failed to generate privacy parameters for milestone payout:', err);
+      closeModal();
+      modals.error('ZKP Proof Error', 'Failed to generate ZKP proof for milestone budget.');
+      isSubmitting.value = false;
+      return;
+    }
+
+    try {
+      let txHash = '';
+      if (circleUserWallet.value) {
+        closeModal();
+        modals.loading('Releasing Milestone Funds', `Releasing Milestone #${milestoneIndex + 1} securely. Processing (Gasless Sponsored Transaction)...`);
+        const payoutRes = await executeSponsoredTransaction({
+          walletId: circleUserWallet.value.id,
+          contractAddress: contractAddress,
+          abiFunctionSignature: 'approvePrivateMilestone(uint256,uint256,uint256,bytes32,bytes,bool)',
+          abiParameters: [
+            jobId.toString(),
+            milestoneIndex.toString(),
+            payoutUnits.toString(),
+            payoutCommitment,
+            payoutProof,
+            isLastMilestone
+          ],
+          userToken: circleSessionToken.value,
+          userAddress: userAddress.value,
+          isSimulation: isSimulationMode.value,
+          executeChallengeFn: executeChallenge
+        });
+        txHash = payoutRes.txHash || 'Pending';
+      } else {
+        const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
+        const walletClient = createWalletClient({
+          account: userAddress.value,
+          chain: arcTestnet,
+          transport: custom(window.ethereum)
+        });
+
+        closeModal();
+        modals.loading('Releasing Milestone Funds', `Confirm confidential milestone payout signature request in your wallet...`);
+        const tx = await walletClient.writeContract({
+          address: contractAddress,
+          abi: GIGMARKET_ESCROW_ABI,
+          functionName: 'approvePrivateMilestone',
+          args: [BigInt(jobId), BigInt(milestoneIndex), payoutUnits, payoutCommitment, payoutProof, isLastMilestone]
+        });
+        closeModal();
+        modals.txPending(tx, 'Verifying ZKP payout proof and releasing stablecoin escrow on-chain. Please wait...');
+        await publicClient.waitForTransactionReceipt({ hash: tx });
+        txHash = tx;
+      }
+
+      const updatedJob = { ...job };
+      updatedJob.milestones[milestoneIndex].completed = true;
+      updatedJob.milestones[milestoneIndex].approved = true;
+      updatedJob.milestones[milestoneIndex].txHash = txHash;
+      updatedJob.currentMilestone = parseInt(updatedJob.currentMilestone) + 1;
+      
+      if (updatedJob.currentMilestone >= updatedJob.milestones.length) {
+        updatedJob.status = 'Completed';
+      }
+
+      await $fetch('/api/jobs', {
+        method: 'POST',
+        body: updatedJob
+      });
+
+      closeModal();
+      modals.success('Milestone Payout Disbursed!', `Successfully transferred milestone funds to the freelancer's wallet and unlocked proportional staking collateral!`);
+      await loadJobsFromLocalDb();
+      await fetchUserBlockchainDetails();
+    } catch (e) {
+      console.error('Confidential milestone payout failed:', e);
+      closeModal();
+      modals.error('Payout Failed', e.message || 'Transaction failed.');
+    } finally {
+      isSubmitting.value = false;
+    }
+    return;
+  }
 
   if (circleUserWallet.value) {
     isSubmitting.value = true;
@@ -3378,11 +4923,36 @@ async function voteDispute(jobId, option) {
   }
 
   const optionStr = option === 1 ? 'Client Payout' : option === 2 ? 'Freelancer Refund' : 'Split budget evenly';
+  const requiredAllowance = 50 * 1e6; // 50 USDC
 
-  if (circleUserWallet.value) {
-    isSubmitting.value = true;
-    modals.loading('Casting Arbitration Vote', `Processing (Gasless Sponsored Transaction)...`);
-    try {
+  isSubmitting.value = true;
+  try {
+    const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
+
+    // Check allowance first
+    const allowance = await publicClient.readContract({
+      address: systemStatus.value.usdcAddress,
+      abi: ERC20_ABI,
+      functionName: 'allowance',
+      args: [userAddress.value, systemStatus.value.contractAddress]
+    });
+
+    if (circleUserWallet.value) {
+      if (allowance < BigInt(requiredAllowance)) {
+        modals.loading('Authorizing Juror Stake', 'Approving 50 USDC stake (Gasless Sponsored)...');
+        await executeSponsoredTransaction({
+          walletId: circleUserWallet.value.id,
+          contractAddress: systemStatus.value.usdcAddress,
+          abiFunctionSignature: 'approve(address,uint256)',
+          abiParameters: [systemStatus.value.contractAddress, requiredAllowance.toString()],
+          userToken: circleSessionToken.value,
+          userAddress: userAddress.value,
+          isSimulation: isSimulationMode.value,
+          executeChallengeFn: executeChallenge
+        });
+      }
+
+      modals.loading('Casting Arbitration Vote', 'Submitting secure vote (Gasless Sponsored)...');
       await executeSponsoredTransaction({
         walletId: circleUserWallet.value.id,
         contractAddress: systemStatus.value.contractAddress,
@@ -3397,45 +4967,46 @@ async function voteDispute(jobId, option) {
       closeModal();
       modals.success('Arbitration Vote Casted!', `Successfully submitted your vote: "${optionStr}" on Job #${jobId}. Thank you for securing the ecosystem!`);
       await fetchDisputeVotesStanding(jobId);
-    } catch (e) {
-      console.error('Circle vote failed:', e);
+      await fetchUserBlockchainDetails();
+    } else {
+      const walletClient = createWalletClient({
+        account: userAddress.value,
+        chain: arcTestnet,
+        transport: custom(window.ethereum)
+      });
+
+      if (allowance < BigInt(requiredAllowance)) {
+        modals.loading('Authorizing Juror Stake', 'Step 1 of 2: Confirming USDC approval inside wallet...');
+        const approveTx = await walletClient.writeContract({
+          address: systemStatus.value.usdcAddress,
+          abi: ERC20_ABI,
+          functionName: 'approve',
+          args: [systemStatus.value.contractAddress, BigInt(requiredAllowance)]
+        });
+        modals.txPending(approveTx, 'Confirming USDC approval on-chain...');
+        await publicClient.waitForTransactionReceipt({ hash: approveTx });
+      }
+
+      modals.loading('Casting Arbitration Vote', 'Step 2 of 2: Confirming vote transaction inside wallet...');
+      const tx = await walletClient.writeContract({
+        address: systemStatus.value.contractAddress,
+        abi: GIGMARKET_ESCROW_ABI,
+        functionName: 'voteOnDispute',
+        args: [BigInt(jobId), option]
+      });
       closeModal();
-      modals.error('Voting Failed', e.message || 'Circle transaction failed.');
-    } finally {
-      isSubmitting.value = false;
+      modals.txPending(tx, 'Submitting secure vote block details to consensus...');
+      await publicClient.waitForTransactionReceipt({ hash: tx });
+
+      closeModal();
+      modals.success('Arbitration Vote Casted!', `Successfully submitted your vote: "${optionStr}" on Job #${jobId}. Thank you for securing the ecosystem!`);
+      await fetchDisputeVotesStanding(jobId);
+      await fetchUserBlockchainDetails();
     }
-    return;
-  }
-
-  isSubmitting.value = true;
-  modals.loading('Casting Arbitration Vote', `Voting option: "${optionStr}" for Job #${jobId}. Confirming signature request...`);
-  
-  try {
-    const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
-    const walletClient = createWalletClient({
-      account: userAddress.value,
-      chain: arcTestnet,
-      transport: custom(window.ethereum)
-    });
-
-    const tx = await walletClient.writeContract({
-      address: systemStatus.value.contractAddress,
-      abi: GIGMARKET_ESCROW_ABI,
-      functionName: 'voteOnDispute',
-      args: [BigInt(jobId), option]
-    });
-    
-    closeModal();
-    modals.txPending(tx, 'Submitting secure vote block details to consensus...');
-    await publicClient.waitForTransactionReceipt({ hash: tx });
-    
-    closeModal();
-    modals.success('Arbitration Vote Casted!', `Successfully submitted your vote: "${optionStr}" on Job #${jobId}. Thank you for securing the ecosystem!`);
-    await fetchDisputeVotesStanding(jobId);
   } catch (e) {
     console.error('Voting failed:', e);
     closeModal();
-    handleError(e, () => voteDispute(jobId, option));
+    modals.error('Voting Failed', e.message || 'Transaction failed.');
   } finally {
     isSubmitting.value = false;
   }
@@ -3447,10 +5018,10 @@ async function resolveDispute(jobId) {
     return;
   }
 
-  if (circleUserWallet.value) {
-    isSubmitting.value = true;
-    modals.loading('Resolving Project Escrow', `Processing (Gasless Sponsored Transaction)...`);
-    try {
+  isSubmitting.value = true;
+  try {
+    if (circleUserWallet.value) {
+      modals.loading('Resolving Project Escrow', 'Processing temporary resolution (Gasless Sponsored)...');
       await executeSponsoredTransaction({
         walletId: circleUserWallet.value.id,
         contractAddress: systemStatus.value.contractAddress,
@@ -3462,67 +5033,273 @@ async function resolveDispute(jobId) {
         executeChallengeFn: executeChallenge
       });
 
-      const job = jobsList.value.find(j => j.id === jobId);
-      const updatedJob = { ...job, status: 'Resolved' };
-      
-      await $fetch('/api/jobs', {
-        method: 'POST',
-        body: updatedJob
+      closeModal();
+      modals.success('Temporary Resolution Decided!', `Job #${jobId} is temporarily resolved. A 1-hour appeal challenge window is now open.`);
+      await loadJobsFromLocalDb();
+    } else {
+      modals.loading('Resolving Project Escrow', 'Confirming resolution transaction inside wallet...');
+      const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
+      const walletClient = createWalletClient({
+        account: userAddress.value,
+        chain: arcTestnet,
+        transport: custom(window.ethereum)
+      });
+
+      const tx = await walletClient.writeContract({
+        address: systemStatus.value.contractAddress,
+        abi: GIGMARKET_ESCROW_ABI,
+        functionName: 'resolveDispute',
+        args: [BigInt(jobId)]
       });
 
       closeModal();
-      modals.success('Escrow Dispute Resolved!', `Securely settled Job #${jobId}. Funds and juror reputation incentives have been completely disbursed!`);
-      await loadJobsFromLocalDb();
-    } catch (e) {
-      console.error('Circle dispute resolution failed:', e);
+      modals.txPending(tx, 'Executing temporary resolution block detail on-chain...');
+      await publicClient.waitForTransactionReceipt({ hash: tx });
+
       closeModal();
-      modals.error('Resolution Failed', e.message || 'Circle transaction failed.');
-    } finally {
-      isSubmitting.value = false;
+      modals.success('Temporary Resolution Decided!', `Job #${jobId} is temporarily resolved. A 1-hour appeal challenge window is now open.`);
+      await loadJobsFromLocalDb();
     }
+  } catch (e) {
+    console.error('Resolution failed:', e);
+    closeModal();
+    modals.error('Resolution Failed', e.message || 'Transaction failed.');
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+
+async function appealDispute(jobId) {
+  if (!userAddress.value) {
+    modals.warning('Wallet Disconnected', 'Please connect your wallet first.');
+    return;
+  }
+
+  const job = jobsList.value.find(j => j.id === jobId);
+  if (!job) return;
+
+  const currentTier = job.dispute?.appealTier || 0;
+  if (currentTier >= 2) {
+    modals.error('Max Tier Reached', 'This dispute is already at the final appeal tier.');
+    return;
+  }
+
+  const appealFee = currentTier === 0 ? 100 * 1e6 : 200 * 1e6;
+
+  isSubmitting.value = true;
+  modals.loading('Appealing Dispute', `Processing appeal fee of ${appealFee / 1e6} USDC...`);
+
+  try {
+    const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
+
+    // 1. Check/Sponsor Allowance
+    const allowance = await publicClient.readContract({
+      address: systemStatus.value.usdcAddress,
+      abi: ERC20_ABI,
+      functionName: 'allowance',
+      args: [userAddress.value, systemStatus.value.contractAddress]
+    });
+
+    if (circleUserWallet.value) {
+      if (allowance < BigInt(appealFee)) {
+        modals.loading('Appealing Dispute', 'Approving USDC for appeal fee (Gasless Sponsored)...');
+        await executeSponsoredTransaction({
+          walletId: circleUserWallet.value.id,
+          contractAddress: systemStatus.value.usdcAddress,
+          abiFunctionSignature: 'approve(address,uint256)',
+          abiParameters: [systemStatus.value.contractAddress, appealFee.toString()],
+          userToken: circleSessionToken.value,
+          userAddress: userAddress.value,
+          isSimulation: isSimulationMode.value,
+          executeChallengeFn: executeChallenge
+        });
+      }
+
+      modals.loading('Appealing Dispute', 'Submitting Appeal (Gasless Sponsored)...');
+      await executeSponsoredTransaction({
+        walletId: circleUserWallet.value.id,
+        contractAddress: systemStatus.value.contractAddress,
+        abiFunctionSignature: 'appealDispute(uint256)',
+        abiParameters: [jobId.toString()],
+        userToken: circleSessionToken.value,
+        userAddress: userAddress.value,
+        isSimulation: isSimulationMode.value,
+        executeChallengeFn: executeChallenge
+      });
+    } else {
+      const walletClient = createWalletClient({
+        account: userAddress.value,
+        chain: arcTestnet,
+        transport: custom(window.ethereum)
+      });
+
+      if (allowance < BigInt(appealFee)) {
+        modals.loading('Appealing Dispute', 'Step 1 of 2: Confirming USDC approval in wallet...');
+        const approveTx = await walletClient.writeContract({
+          address: systemStatus.value.usdcAddress,
+          abi: ERC20_ABI,
+          functionName: 'approve',
+          args: [systemStatus.value.contractAddress, BigInt(appealFee)]
+        });
+        modals.txPending(approveTx, 'Confirming USDC approval on-chain...');
+        await publicClient.waitForTransactionReceipt({ hash: approveTx });
+      }
+
+      modals.loading('Appealing Dispute', 'Step 2 of 2: Confirming appeal transaction in wallet...');
+      const tx = await walletClient.writeContract({
+        address: systemStatus.value.contractAddress,
+        abi: GIGMARKET_ESCROW_ABI,
+        functionName: 'appealDispute',
+        args: [BigInt(jobId)]
+      });
+      modals.txPending(tx, 'Submitting appeal to consensus...');
+      await publicClient.waitForTransactionReceipt({ hash: tx });
+    }
+
+    closeModal();
+    modals.success('Dispute Appealed Successfully', `Dispute on Job #${jobId} has been appealed to Tier ${currentTier + 1}. Voting is reopened.`);
+    await loadJobsFromLocalDb();
+    await fetchUserBlockchainDetails();
+  } catch (e) {
+    console.error('Appeal failed:', e);
+    closeModal();
+    modals.error('Appeal Failed', e.message || 'Transaction failed.');
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+
+async function executeRuling(jobId) {
+  if (!userAddress.value) {
+    modals.warning('Wallet Disconnected', 'Please connect your wallet first.');
     return;
   }
 
   isSubmitting.value = true;
-  modals.loading('Resolving Project Escrow', `Compiling consensus votes and executing payouts for Job #${jobId}...`);
+  modals.loading('Executing Ruling', 'Submitting final dispute execution...');
+
   try {
-    const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
-    const walletClient = createWalletClient({
-      account: userAddress.value,
-      chain: arcTestnet,
-      transport: custom(window.ethereum)
-    });
+    if (circleUserWallet.value) {
+      await executeSponsoredTransaction({
+        walletId: circleUserWallet.value.id,
+        contractAddress: systemStatus.value.contractAddress,
+        abiFunctionSignature: 'executeRuling(uint256)',
+        abiParameters: [jobId.toString()],
+        userToken: circleSessionToken.value,
+        userAddress: userAddress.value,
+        isSimulation: isSimulationMode.value,
+        executeChallengeFn: executeChallenge
+      });
+    } else {
+      const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
+      const walletClient = createWalletClient({
+        account: userAddress.value,
+        chain: arcTestnet,
+        transport: custom(window.ethereum)
+      });
+      const tx = await walletClient.writeContract({
+        address: systemStatus.value.contractAddress,
+        abi: GIGMARKET_ESCROW_ABI,
+        functionName: 'executeRuling',
+        args: [BigInt(jobId)]
+      });
+      modals.txPending(tx, 'Executing ruling on-chain...');
+      await publicClient.waitForTransactionReceipt({ hash: tx });
+    }
 
-    const tx = await walletClient.writeContract({
-      address: systemStatus.value.contractAddress,
-      abi: GIGMARKET_ESCROW_ABI,
-      functionName: 'resolveDispute',
-      args: [BigInt(jobId)]
-    });
-    
     closeModal();
-    modals.txPending(tx, 'Distributing locked stablecoins and juror staking incentives. Please wait...');
-    await publicClient.waitForTransactionReceipt({ hash: tx });
-
-    // Update status in local DB
-    const job = jobsList.value.find(j => j.id === jobId);
-    const updatedJob = { ...job, status: 'Resolved' };
-    
-    await $fetch('/api/jobs', {
-      method: 'POST',
-      body: updatedJob
-    });
-
-    closeModal();
-    modals.success('Escrow Dispute Resolved!', `Securely settled Job #${jobId}. Funds and juror reputation incentives have been completely disbursed!`);
+    modals.success('Ruling Executed', `Escrow funds and juror rewards/slashes for Job #${jobId} have been fully settled.`);
     await loadJobsFromLocalDb();
+    await fetchUserBlockchainDetails();
   } catch (e) {
-    console.error('Resolution failed:', e);
+    console.error('Execution failed:', e);
     closeModal();
-    handleError(e, () => resolveDispute(jobId));
+    modals.error('Execution Failed', e.message || 'Transaction failed.');
   } finally {
     isSubmitting.value = false;
   }
+}
+
+async function resolveFinalAppeal(jobId, ruling) {
+  if (!userAddress.value) {
+    modals.warning('Wallet Disconnected', 'Please connect your wallet first.');
+    return;
+  }
+
+  const rulingLabels = { 1: 'Client Wins', 2: 'Freelancer Wins', 3: 'Split 50/50' };
+
+  isSubmitting.value = true;
+  modals.loading('Supreme Court Resolution', `Submitting platform final ruling: "${rulingLabels[ruling]}"...`);
+
+  try {
+    if (circleUserWallet.value) {
+      await executeSponsoredTransaction({
+        walletId: circleUserWallet.value.id,
+        contractAddress: systemStatus.value.contractAddress,
+        abiFunctionSignature: 'resolveFinalAppeal(uint256,uint8)',
+        abiParameters: [jobId.toString(), ruling.toString()],
+        userToken: circleSessionToken.value,
+        userAddress: userAddress.value,
+        isSimulation: isSimulationMode.value,
+        executeChallengeFn: executeChallenge
+      });
+    } else {
+      const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
+      const walletClient = createWalletClient({
+        account: userAddress.value,
+        chain: arcTestnet,
+        transport: custom(window.ethereum)
+      });
+      const tx = await walletClient.writeContract({
+        address: systemStatus.value.contractAddress,
+        abi: GIGMARKET_ESCROW_ABI,
+        functionName: 'resolveFinalAppeal',
+        args: [BigInt(jobId), ruling]
+      });
+      modals.txPending(tx, 'Resolving final appeal on-chain...');
+      await publicClient.waitForTransactionReceipt({ hash: tx });
+    }
+
+    closeModal();
+    modals.success('Final Appeal Resolved', `The platform Supreme Court has ruled: "${rulingLabels[ruling]}" on Job #${jobId}. Funds and slanders have been executed.`);
+    await loadJobsFromLocalDb();
+    await fetchUserBlockchainDetails();
+  } catch (e) {
+    console.error('Final appeal resolution failed:', e);
+    closeModal();
+    modals.error('Resolution Failed', e.message || 'Transaction failed.');
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+
+function openAppealModal(jobId) {
+  appealJobId.value = jobId;
+  showAppealModal.value = true;
+}
+
+function confirmAppeal() {
+  const jobId = appealJobId.value;
+  showAppealModal.value = false;
+  appealDispute(jobId);
+}
+
+function getRulingLabel(ruling) {
+  if (ruling === 1) return 'Client Wins';
+  if (ruling === 2) return 'Freelancer Wins';
+  if (ruling === 3) return 'Split 50/50';
+  return 'Pending';
+}
+
+function formatDeadline(timestamp) {
+  if (!timestamp) return 'N/A';
+  const date = new Date(timestamp * 1000);
+  return date.toLocaleString();
+}
+
+function isAppealWindowClosed(job) {
+  if (!job.dispute || !job.dispute.appealDeadline) return true;
+  return Date.now() > job.dispute.appealDeadline * 1000;
 }
 
 // --- AUTOMATED GIT MERGE PAYOUT SIMULATOR (Feature B) ---

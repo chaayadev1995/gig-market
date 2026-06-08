@@ -4,6 +4,13 @@ export default defineNuxtConfig({
   ssr: false,
   devtools: { enabled: true },
   css: ['~/assets/css/main.css'],
+  nitro: {
+    esbuild: {
+      options: {
+        target: 'es2022'
+      }
+    }
+  },
   app: {
     head: {
       title: 'GigMarket - Decentralized Freelance Commerce Stack',
