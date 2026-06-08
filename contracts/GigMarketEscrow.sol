@@ -18,6 +18,62 @@ interface IStableFXRouter {
     ) external returns (uint256 amountOut);
 }
 
+interface IUSYC {
+    function mint(uint256 usdcAmount) external returns (uint256);
+    function redeem(uint256 shareAmount) external returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function getSharePrice() external view returns (uint256);
+}
+
+contract MockUSYC {
+    IERC20 public immutable usdcToken;
+    uint256 public deployTime;
+    uint256 public constant YIELD_RATE_PER_SECOND = 10; // simulates yield in 6 decimals per second
+
+    string public name = "USD Yield Coin";
+    string public symbol = "USYC";
+    uint8 public decimals = 6;
+    uint256 public totalSupply;
+    mapping(address => uint256) public balanceOf;
+
+    constructor(address _usdcToken) {
+        usdcToken = IERC20(_usdcToken);
+        deployTime = block.timestamp;
+    }
+
+    function getSharePrice() public view returns (uint256) {
+        uint256 elapsed = block.timestamp - deployTime;
+        // Simulates rate growing by 10 units of 6 decimals per second (~5% APY simulated)
+        return 1e6 + (elapsed * YIELD_RATE_PER_SECOND);
+    }
+
+    function mint(uint256 usdcAmount) external returns (uint256) {
+        require(usdcAmount > 0, "Amount must be > 0");
+        uint256 price = getSharePrice();
+        uint256 shares = (usdcAmount * 1e6) / price;
+        
+        require(usdcToken.transferFrom(msg.sender, address(this), usdcAmount), "Transfer failed");
+        
+        balanceOf[msg.sender] += shares;
+        totalSupply += shares;
+        return shares;
+    }
+
+    function redeem(uint256 shareAmount) external returns (uint256) {
+        require(shareAmount > 0, "Shares must be > 0");
+        require(balanceOf[msg.sender] >= shareAmount, "Insufficient shares");
+        
+        uint256 price = getSharePrice();
+        uint256 usdcAmount = (shareAmount * price) / 1e6;
+        
+        balanceOf[msg.sender] -= shareAmount;
+        totalSupply -= shareAmount;
+        
+        require(usdcToken.transfer(msg.sender, usdcAmount), "Transfer failed");
+        return usdcAmount;
+    }
+}
+
 contract GigMarketEscrow {
     enum JobStatus { Created, Active, Disputed, Resolved, Completed }
     enum VoteOption { None, ClientWins, FreelancerWins, Split }
@@ -41,6 +97,8 @@ contract GigMarketEscrow {
         uint256 creationTime;
         uint256 milestonesCount;
         uint256 currentMilestone;
+        uint256 accumulatedYield; // Accrued yield (in USDC, 6 decimals)
+        uint256 yieldDistributed; // Distributed yield (in USDC, 6 decimals)
     }
 
     IERC20 public immutable usdcToken;
@@ -49,6 +107,9 @@ contract GigMarketEscrow {
     address public owner;
     uint256 public jobCount;
     uint256 public platformFeesAccumulated;
+
+    IUSYC public usycToken;
+    mapping(uint256 => uint256) public jobUsycShares;
 
     // Reputation: address => rating score/successful projects
     mapping(address => uint256) public reputation;
@@ -113,6 +174,35 @@ contract GigMarketEscrow {
         eurcToken = IERC20(_eurcToken);
     }
 
+    function setUsycToken(address _usycToken) external onlyOwner {
+        usycToken = IUSYC(_usycToken);
+    }
+
+    function calculateAccruedYield(uint256 jobId) public view returns (uint256) {
+        if (address(usycToken) == address(0) || jobUsycShares[jobId] == 0) {
+            return 0;
+        }
+        Job memory job = jobs[jobId];
+        uint256 remainingPrincipal = 0;
+        if (job.status == JobStatus.Active || job.status == JobStatus.Disputed) {
+            for (uint256 i = job.currentMilestone; i < job.milestonesCount; i++) {
+                remainingPrincipal += jobMilestones[jobId][i].budget;
+            }
+            remainingPrincipal += job.freelancerStake;
+        } else if (job.status == JobStatus.Created) {
+            remainingPrincipal = job.budget;
+        } else {
+            return 0;
+        }
+
+        uint256 price = usycToken.getSharePrice();
+        uint256 currentValue = (jobUsycShares[jobId] * price) / 1e6;
+        if (currentValue > remainingPrincipal) {
+            return currentValue - remainingPrincipal;
+        }
+        return 0;
+    }
+
     function setPayoutCurrency(uint256 jobId, string calldata currency) external onlyJobFreelancer(jobId) {
         require(
             keccak256(abi.encodePacked(currency)) == keccak256(abi.encodePacked("USDC")) ||
@@ -173,7 +263,9 @@ contract GigMarketEscrow {
             repoUrl: repoUrl,
             creationTime: block.timestamp,
             milestonesCount: milestoneBudgets.length,
-            currentMilestone: 0
+            currentMilestone: 0,
+            accumulatedYield: 0,
+            yieldDistributed: 0
         });
 
         for (uint256 i = 0; i < milestoneBudgets.length; i++) {
@@ -190,6 +282,12 @@ contract GigMarketEscrow {
             usdcToken.transferFrom(msg.sender, address(this), budget),
             "USDC funding failed"
         );
+
+        if (address(usycToken) != address(0)) {
+            usdcToken.approve(address(usycToken), budget);
+            uint256 shares = IUSYC(address(usycToken)).mint(budget);
+            jobUsycShares[jobId] = shares;
+        }
 
         emit JobCreated(jobId, msg.sender, budget, repoUrl);
         return jobId;
@@ -213,6 +311,11 @@ contract GigMarketEscrow {
                 usdcToken.transferFrom(msg.sender, address(this), reqStake),
                 "Collateral staking failed"
             );
+            if (address(usycToken) != address(0)) {
+                usdcToken.approve(address(usycToken), reqStake);
+                uint256 shares = IUSYC(address(usycToken)).mint(reqStake);
+                jobUsycShares[jobId] += shares;
+            }
         }
 
         emit JobJoined(jobId, msg.sender, reqStake);
@@ -261,24 +364,75 @@ contract GigMarketEscrow {
         }
 
         job.currentMilestone++;
+        
+        // Payout to Freelancer: Milestone earnings + Staked Collateral return (principal)
+        uint256 totalPayoutUSDC = freelancerPayout + stakeReturn;
+
+        // Redeem from USYC if configured
+        uint256 usdcReceived = totalPayoutUSDC;
+        uint256 yieldAccrued = 0;
+        
+        if (address(usycToken) != address(0) && jobUsycShares[jobId] > 0) {
+            uint256 totalJobFunding = job.budget + job.requiredStake;
+            uint256 sharesToRedeem;
+            if (job.currentMilestone == job.milestonesCount) {
+                sharesToRedeem = jobUsycShares[jobId];
+            } else {
+                sharesToRedeem = (jobUsycShares[jobId] * totalPayoutUSDC) / totalJobFunding;
+            }
+            
+            if (sharesToRedeem > 0) {
+                if (sharesToRedeem > jobUsycShares[jobId]) {
+                    sharesToRedeem = jobUsycShares[jobId];
+                }
+                jobUsycShares[jobId] -= sharesToRedeem;
+                
+                uint256 balanceBefore = usdcToken.balanceOf(address(this));
+                IUSYC(address(usycToken)).redeem(sharesToRedeem);
+                usdcReceived = usdcToken.balanceOf(address(this)) - balanceBefore;
+                
+                if (usdcReceived > totalPayoutUSDC) {
+                    yieldAccrued = usdcReceived - totalPayoutUSDC;
+                }
+            }
+        }
+
+        uint256 freelancerYield = 0;
+        uint256 clientYield = 0;
+        uint256 platformYield = 0;
+        
+        if (yieldAccrued > 0) {
+            freelancerYield = (yieldAccrued * 50) / 100;
+            clientYield = (yieldAccrued * 30) / 100;
+            platformYield = yieldAccrued - freelancerYield - clientYield;
+            
+            platformFeesAccumulated += platformYield;
+            job.accumulatedYield += yieldAccrued;
+            job.yieldDistributed += yieldAccrued;
+            
+            if (clientYield > 0) {
+                require(usdcToken.transfer(job.client, clientYield), "Client yield transfer failed");
+            }
+        }
+
         if (job.currentMilestone == job.milestonesCount) {
             job.status = JobStatus.Completed;
             // Reward freelancer reputation
             reputation[job.freelancer] += 1;
         }
 
-        // Payout to Freelancer: Milestone earnings + Staked Collateral return
-        uint256 totalPayoutUSDC = freelancerPayout + stakeReturn;
+        // Payout to Freelancer: principal + 50% yield
+        uint256 totalFreelancerPayout = totalPayoutUSDC + freelancerYield;
 
         if (keccak256(abi.encodePacked(jobPayoutCurrency[jobId])) == keccak256(abi.encodePacked("EURC")) && stableFXRouter != address(0)) {
             // Approve router to spend USDC
-            usdcToken.approve(stableFXRouter, totalPayoutUSDC);
+            usdcToken.approve(stableFXRouter, totalFreelancerPayout);
             
             // Execute swap via stableFXRouter
             uint256 amountOut = IStableFXRouter(stableFXRouter).swap(
                 address(usdcToken),
                 address(eurcToken),
-                totalPayoutUSDC,
+                totalFreelancerPayout,
                 minAmountEURC,
                 job.freelancer
             );
@@ -287,7 +441,7 @@ contract GigMarketEscrow {
         } else {
             // Transfer USDC directly
             require(
-                usdcToken.transfer(job.freelancer, totalPayoutUSDC),
+                usdcToken.transfer(job.freelancer, totalFreelancerPayout),
                 "Payout transfer failed"
             );
         }
@@ -372,6 +526,45 @@ contract GigMarketEscrow {
         
         uint256 freelancerStake = job.freelancerStake;
         uint256 totalEscrowed = remainingBudget + freelancerStake;
+
+        // Redeem all remaining USYC shares
+        uint256 usdcReceived = totalEscrowed;
+        uint256 yieldAccrued = 0;
+        
+        if (address(usycToken) != address(0) && jobUsycShares[jobId] > 0) {
+            uint256 sharesToRedeem = jobUsycShares[jobId];
+            jobUsycShares[jobId] = 0;
+            
+            uint256 balanceBefore = usdcToken.balanceOf(address(this));
+            IUSYC(address(usycToken)).redeem(sharesToRedeem);
+            usdcReceived = usdcToken.balanceOf(address(this)) - balanceBefore;
+            
+            if (usdcReceived > totalEscrowed) {
+                yieldAccrued = usdcReceived - totalEscrowed;
+            }
+        }
+
+        // Distribute yield
+        uint256 freelancerYield = 0;
+        uint256 clientYield = 0;
+        uint256 platformYield = 0;
+        
+        if (yieldAccrued > 0) {
+            freelancerYield = (yieldAccrued * 50) / 100;
+            clientYield = (yieldAccrued * 30) / 100;
+            platformYield = yieldAccrued - freelancerYield - clientYield;
+            
+            platformFeesAccumulated += platformYield;
+            job.accumulatedYield += yieldAccrued;
+            job.yieldDistributed += yieldAccrued;
+            
+            if (clientYield > 0) {
+                require(usdcToken.transfer(job.client, clientYield), "Client yield transfer failed");
+            }
+            if (freelancerYield > 0) {
+                require(usdcToken.transfer(job.freelancer, freelancerYield), "Freelancer yield transfer failed");
+            }
+        }
 
         // Arbitration fee: 3% of the escrowed funds
         uint256 arbitrationFee = (totalEscrowed * 3) / 100;
