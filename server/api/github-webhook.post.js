@@ -21,7 +21,7 @@ function findJobByRepo(repoName) {
   }
 }
 
-function updateJobMilestone(jobId, milestoneIndex, txHash) {
+function updateJobMilestone(jobId, milestoneIndex, txHash, scpTransactionId = null) {
   if (!fs.existsSync(JOBS_DB_PATH)) return;
   try {
     const jobs = JSON.parse(fs.readFileSync(JOBS_DB_PATH, 'utf8'));
@@ -32,13 +32,19 @@ function updateJobMilestone(jobId, milestoneIndex, txHash) {
         job.milestones[milestoneIndex].completed = true;
         job.milestones[milestoneIndex].approved = true;
         job.milestones[milestoneIndex].txHash = txHash;
+        if (scpTransactionId) {
+          job.milestones[milestoneIndex].scpTransactionId = scpTransactionId;
+        }
+      }
+      if (scpTransactionId) {
+        job.scpTransactionId = scpTransactionId;
       }
       job.currentMilestone = parseInt(job.currentMilestone || 0) + 1;
       if (job.currentMilestone >= job.milestones.length) {
         job.status = 'Completed';
       }
       fs.writeFileSync(JOBS_DB_PATH, JSON.stringify(jobs, null, 2));
-      console.log(`Updated local job database for Job #${jobId}, Milestone ${milestoneIndex}`);
+      console.log(`Updated local job database for Job #${jobId}, Milestone ${milestoneIndex} with scpTransactionId: ${scpTransactionId}`);
     }
   } catch (e) {
     console.error('Error updating job database:', e);
@@ -58,12 +64,14 @@ export default defineEventHandler(async (event) => {
 
     try {
       const result = await executeEscrowApproval(parseInt(jobId), parseInt(milestoneIndex));
-      updateJobMilestone(parseInt(jobId), parseInt(milestoneIndex), result.txHash);
+      const scpTxId = result.transactionId || result.scpTransactionId || null;
+      updateJobMilestone(parseInt(jobId), parseInt(milestoneIndex), result.txHash, scpTxId);
       return {
         success: true,
         message: 'Simulated Git Merge auto-payout triggered successfully!',
         txHash: result.txHash,
         mode: result.mode,
+        scpTransactionId: scpTxId,
       };
     } catch (e) {
       console.error('Simulation execution failed:', e);
@@ -108,11 +116,13 @@ export default defineEventHandler(async (event) => {
 
       try {
         const result = await executeEscrowApproval(jobId, currentMilestoneIndex);
-        updateJobMilestone(jobId, currentMilestoneIndex, result.txHash);
+        const scpTxId = result.transactionId || result.scpTransactionId || null;
+        updateJobMilestone(jobId, currentMilestoneIndex, result.txHash, scpTxId);
         return {
           success: true,
           message: `Escrow payout transaction sent: ${result.txHash}`,
           txHash: result.txHash,
+          scpTransactionId: scpTxId,
         };
       } catch (e) {
         console.error('Smart contract payout invocation failed:', e);

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { readBody, getMethod, defineEventHandler } from 'h3';
-import { getContractAddress, arcTestnet } from '../utils/circle';
+import { getContractAddress, getAgentEscrow8183Address, arcTestnet } from '../utils/circle';
 import { createPublicClient, http } from 'viem';
 
 const JOBS_DB_PATH = path.resolve('./db/jobs.json');
@@ -35,6 +35,7 @@ export default defineEventHandler(async (event) => {
   if (method === 'GET') {
     const jobs = readJobs();
     const contractAddress = getContractAddress();
+    const agentEscrowAddress = getAgentEscrow8183Address();
     
     // Fetch ABI
     const artifactPath = path.resolve('./artifacts_contract/contracts/GigMarketEscrow.sol/GigMarketEscrow.json');
@@ -48,6 +49,17 @@ export default defineEventHandler(async (event) => {
       }
     }
 
+    const agentArtifactPath = path.resolve('./artifacts_contract/contracts/AgentEscrow8183.sol/AgentEscrow8183.json');
+    let agentAbi = [];
+    if (fs.existsSync(agentArtifactPath)) {
+      try {
+        const contractJson = JSON.parse(fs.readFileSync(agentArtifactPath, 'utf8'));
+        agentAbi = contractJson.abi;
+      } catch (e) {
+        console.error('Error reading AgentEscrow8183 ABI:', e);
+      }
+    }
+
     if (abi.length > 0 && contractAddress) {
       try {
         const publicClient = createPublicClient({
@@ -57,58 +69,141 @@ export default defineEventHandler(async (event) => {
 
         const enrichedJobs = [];
         for (const job of jobs) {
-          try {
-            const onChainJob = await publicClient.readContract({
-              address: contractAddress,
-              abi,
-              functionName: 'jobs',
-              args: [BigInt(job.id)],
-            });
-            
-            const statusMap = ['Created', 'Active', 'Disputed', 'Resolved', 'Completed'];
-            job.status = statusMap[Number(onChainJob[6])];
-            job.freelancer = onChainJob[2];
-            job.freelancerStake = Number(onChainJob[4]) / 1e6;
-            job.requiredStake = Number(onChainJob[5]) / 1e6;
-            job.currentMilestone = Number(onChainJob[10]);
-            job.accumulatedYield = Number(onChainJob[11]) / 1e6;
-            job.yieldDistributed = Number(onChainJob[12]) / 1e6;
-
-            // Fetch live yield
+          if (job.isAgentic || job.escrowType === 'ERC8183') {
             try {
-              const liveYield = await publicClient.readContract({
-                address: contractAddress,
-                abi,
-                functionName: 'calculateAccruedYield',
-                args: [BigInt(job.id)],
-              });
-              job.liveAccruedYield = Number(liveYield) / 1e6;
-            } catch (yieldErr) {
-              job.liveAccruedYield = 0;
+              if (agentAbi.length > 0 && agentEscrowAddress) {
+                const onChainJob = await publicClient.readContract({
+                  address: agentEscrowAddress,
+                  abi: agentAbi,
+                  functionName: 'jobs',
+                  args: [BigInt(job.id)],
+                });
+
+                const statusMap8183 = ['Open', 'Funded', 'Submitted', 'Completed', 'Rejected'];
+                job.status = statusMap8183[Number(onChainJob[6])];
+                job.freelancer = onChainJob[1];
+                job.client = onChainJob[0];
+                job.amount = Number(onChainJob[4]) / 1e6;
+                job.expiry = Number(onChainJob[5]);
+                job.deliverableHash = onChainJob[7];
+              }
+            } catch (err) {
+              console.error('Error reading on-chain job details from AgentEscrow8183:', err);
             }
-
-            // Fetch splits
+          } else {
             try {
-              const splitsResult = await publicClient.readContract({
+              const onChainJob = await publicClient.readContract({
                 address: contractAddress,
                 abi,
-                functionName: 'getJobSplits',
+                functionName: 'jobs',
                 args: [BigInt(job.id)],
               });
-              const recipients = splitsResult[0] || [];
-              const splits = splitsResult[1] || [];
-              job.recipients = recipients.map(r => r.toString());
-              job.splits = splits.map(s => Number(s));
-            } catch (splitsErr) {
+              
+              // Query privacy status
+              let isPrivate = false;
+              let encDetailsStr = '';
+              try {
+                isPrivate = await publicClient.readContract({
+                  address: contractAddress,
+                  abi,
+                  functionName: 'isPrivateJob',
+                  args: [BigInt(job.id)],
+                });
+                if (isPrivate) {
+                  encDetailsStr = await publicClient.readContract({
+                    address: contractAddress,
+                    abi,
+                    functionName: 'jobEncryptedDetails',
+                    args: [BigInt(job.id)],
+                  });
+                }
+              } catch (privacyError) {
+                console.error('Error fetching privacy fields:', privacyError);
+              }
+
+              const statusMap = ['Created', 'Active', 'Disputed', 'Resolved', 'Completed', 'AppealPending'];
+              job.status = statusMap[Number(onChainJob[6])];
+              job.freelancer = onChainJob[2];
+              job.isPrivate = isPrivate || job.isPrivate || false;
+
+              // Fetch dispute state details
+              try {
+                const dsResult = await publicClient.readContract({
+                  address: contractAddress,
+                  abi,
+                  functionName: 'disputeStates',
+                  args: [BigInt(job.id)],
+                });
+                job.dispute = {
+                  appealTier: Number(dsResult[0]),
+                  ruling: Number(dsResult[1]),
+                  resolveTime: Number(dsResult[2]),
+                  rulingExecuted: dsResult[3],
+                  appealDeadline: Number(dsResult[4]),
+                  totalAppealPot: Number(dsResult[5]) / 1e6,
+                };
+              } catch (dsErr) {
+                job.dispute = null;
+              }
+
+              if (job.isPrivate) {
+                job.budget = 0;
+                job.amount = 0;
+                if (encDetailsStr) {
+                  try {
+                    job.encryptedDetails = JSON.parse(encDetailsStr);
+                  } catch (e) {
+                    // Fallback if already parsed or not JSON
+                    job.encryptedDetails = encDetailsStr;
+                  }
+                }
+              } else {
+                job.amount = Number(onChainJob[3]) / 1e6;
+                job.budget = Number(onChainJob[3]) / 1e6;
+              }
+
+              job.freelancerStake = Number(onChainJob[4]) / 1e6;
+              job.requiredStake = Number(onChainJob[5]) / 1e6;
+              job.currentMilestone = Number(onChainJob[10]);
+              job.accumulatedYield = Number(onChainJob[11]) / 1e6;
+              job.yieldDistributed = Number(onChainJob[12]) / 1e6;
+
+              // Fetch live yield
+              try {
+                const liveYield = await publicClient.readContract({
+                  address: contractAddress,
+                  abi,
+                  functionName: 'calculateAccruedYield',
+                  args: [BigInt(job.id)],
+                });
+                job.liveAccruedYield = Number(liveYield) / 1e6;
+              } catch (yieldErr) {
+                job.liveAccruedYield = 0;
+              }
+
+              // Fetch splits
+              try {
+                const splitsResult = await publicClient.readContract({
+                  address: contractAddress,
+                  abi,
+                  functionName: 'getJobSplits',
+                  args: [BigInt(job.id)],
+                });
+                const recipients = splitsResult[0] || [];
+                const splits = splitsResult[1] || [];
+                job.recipients = recipients.map(r => r.toString());
+                job.splits = splits.map(s => Number(s));
+              } catch (splitsErr) {
+                job.recipients = job.recipients || [];
+                job.splits = job.splits || [];
+              }
+            } catch (onChainError) {
+              if (job.accumulatedYield === undefined) job.accumulatedYield = 0;
+              if (job.yieldDistributed === undefined) job.yieldDistributed = 0;
+              if (job.liveAccruedYield === undefined) job.liveAccruedYield = 0;
               job.recipients = job.recipients || [];
               job.splits = job.splits || [];
             }
-          } catch (onChainError) {
-            if (job.accumulatedYield === undefined) job.accumulatedYield = 0;
-            if (job.yieldDistributed === undefined) job.yieldDistributed = 0;
-            if (job.liveAccruedYield === undefined) job.liveAccruedYield = 0;
-            job.recipients = job.recipients || [];
-            job.splits = job.splits || [];
           }
           enrichedJobs.push(job);
         }

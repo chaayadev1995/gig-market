@@ -1,5 +1,6 @@
-import { getCircleConfigStatus, getContractAddress, arcTestnet } from '../utils/circle';
+import { getCircleConfigStatus, getContractAddress, getAgentEscrow8183Address, arcTestnet } from '../utils/circle';
 import { createPublicClient, http, formatUnits } from 'viem';
+import { getQuery } from 'h3';
 import fs from 'fs';
 import path from 'path';
 
@@ -8,6 +9,7 @@ const USDC_TOKEN_ADDRESS = '0x3600000000000000000000000000000000000000';
 export default defineEventHandler(async (event) => {
   const status = getCircleConfigStatus();
   const contractAddress = getContractAddress();
+  const agentEscrowAddress = getAgentEscrow8183Address();
 
   const publicClient = createPublicClient({
     chain: arcTestnet,
@@ -77,9 +79,18 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  const query = getQuery(event);
+  const profileAddress = query.walletAddress;
+  let profile = null;
+  if (profileAddress) {
+    const { getUserProfile } = await import('../utils/users');
+    profile = getUserProfile(profileAddress);
+  }
+
   return {
     circleStatus: status,
     contractAddress,
+    agentEscrowAddress,
     walletAddress,
     kitKey: process.env.KIT_KEY || '',
     balances: {
@@ -87,5 +98,6 @@ export default defineEventHandler(async (event) => {
       usdc: usdcBalance,
       symbol: 'USDC',
     },
+    profile,
   };
 });
