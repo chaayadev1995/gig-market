@@ -86,10 +86,29 @@ export default defineEventHandler(async (event) => {
             } catch (yieldErr) {
               job.liveAccruedYield = 0;
             }
+
+            // Fetch splits
+            try {
+              const splitsResult = await publicClient.readContract({
+                address: contractAddress,
+                abi,
+                functionName: 'getJobSplits',
+                args: [BigInt(job.id)],
+              });
+              const recipients = splitsResult[0] || [];
+              const splits = splitsResult[1] || [];
+              job.recipients = recipients.map(r => r.toString());
+              job.splits = splits.map(s => Number(s));
+            } catch (splitsErr) {
+              job.recipients = job.recipients || [];
+              job.splits = job.splits || [];
+            }
           } catch (onChainError) {
             if (job.accumulatedYield === undefined) job.accumulatedYield = 0;
             if (job.yieldDistributed === undefined) job.yieldDistributed = 0;
             if (job.liveAccruedYield === undefined) job.liveAccruedYield = 0;
+            job.recipients = job.recipients || [];
+            job.splits = job.splits || [];
           }
           enrichedJobs.push(job);
         }
@@ -103,6 +122,8 @@ export default defineEventHandler(async (event) => {
       if (job.accumulatedYield === undefined) job.accumulatedYield = 0;
       if (job.yieldDistributed === undefined) job.yieldDistributed = 0;
       if (job.liveAccruedYield === undefined) job.liveAccruedYield = 0;
+      if (job.recipients === undefined) job.recipients = [];
+      if (job.splits === undefined) job.splits = [];
       return job;
     });
   }
