@@ -20,8 +20,7 @@ node_modules/
 !.env.example
 
 # Local Database & Deployment Artifacts (Runtime)
-db/jobs.json
-db/contract-address.json
+db/
 
 # Logs & Debugging
 logs/
@@ -43,3 +42,5 @@ Thumbs.db
 *.sln
 *.sw?
 gigmarket_evolution_roadmap.md
+build_log.txt
+
