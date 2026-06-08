@@ -349,6 +349,26 @@
                 </div>
               </div>
 
+              <!-- Team Split Configuration (Feature F) -->
+              <div style="margin-top: 15px; border-top: 2px solid var(--border-color); padding-top: 15px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--text-primary);">
+                  <input type="checkbox" v-model="enableSplits" style="accent-color: var(--accent-teal);" />
+                  Enable Team Split Payouts
+                </label>
+                <div v-if="enableSplits" style="margin-top: 12px; background: var(--bg-secondary); border: 2px solid var(--border-color); padding: 12px; border-radius: var(--border-radius-sm);">
+                  <h5 style="font-size: 12px; margin-bottom: 8px; color: var(--accent-teal-dark);">Configure Team Splits</h5>
+                  <div v-for="(r, idx) in splitRecipients" :key="idx" style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+                    <input v-model="r.address" type="text" class="form-input" style="flex: 2; padding: 6px 10px; font-size: 12px;" placeholder="Wallet Address (0x...)" required />
+                    <input v-model.number="r.percentage" type="number" class="form-input" style="flex: 1; padding: 6px 10px; font-size: 12px; max-width: 80px;" placeholder="%" min="1" max="100" required />
+                    <button type="button" class="btn btn-danger btn-small" style="padding: 4px 8px; margin: 0; min-height: auto;" @click="removeSplitRecipient(idx)" :disabled="splitRecipients.length === 1">×</button>
+                  </div>
+                  <button type="button" class="btn btn-secondary btn-small" style="margin-top: 6px; padding: 4px 10px;" @click="addSplitRecipient">+ Add Member</button>
+                  <p style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
+                    Ensure total splits equal exactly 100%. All milestone payouts will be automatically routed on-chain to these members.
+                  </p>
+                </div>
+              </div>
+
               <div style="margin-top: 24px;">
                 <button type="submit" class="btn btn-primary" style="width: 100%;" :disabled="isSubmitting">
                   <span v-if="isSubmitting">Funding Escrow...</span>
@@ -397,6 +417,17 @@
                     <div class="gig-meta-item">
                       <span class="gig-meta-label">Required Stake</span>
                       <span class="gig-meta-value">{{ job.requiredStake }} USDC</span>
+                    </div>
+                  </div>
+
+                  <!-- Team Split Ratios Display (Feature F) -->
+                  <div v-if="job.recipients && job.recipients.length > 0" style="margin-top: 15px; background: var(--bg-secondary); border: 2px solid var(--border-color); padding: 12px; border-radius: var(--border-radius-sm); box-shadow: 2px 2px 0px var(--border-color);">
+                    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--accent-purple); margin-bottom: 6px;">👥 Team Split Ratios</div>
+                    <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-family: monospace;">
+                      <div v-for="(recip, idx) in job.recipients" :key="idx" style="display: flex; justify-content: space-between;">
+                        <span>{{ recip.toLowerCase() === userAddress.toLowerCase() ? 'You' : shortAddress(recip) }}</span>
+                        <span style="font-weight: 700; color: var(--accent-teal-dark);">{{ job.splits[idx] }}%</span>
+                      </div>
                     </div>
                   </div>
 
@@ -585,6 +616,17 @@
                     </div>
                   </div>
 
+                  <!-- Team Split Ratios Display (Feature F) -->
+                  <div v-if="job.recipients && job.recipients.length > 0" style="margin-top: 15px; background: var(--bg-secondary); border: 2px solid var(--border-color); padding: 12px; border-radius: var(--border-radius-sm); box-shadow: 2px 2px 0px var(--border-color);">
+                    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--accent-purple); margin-bottom: 6px;">👥 Team Split Ratios</div>
+                    <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-family: monospace;">
+                      <div v-for="(recip, idx) in job.recipients" :key="idx" style="display: flex; justify-content: space-between;">
+                        <span>{{ recip.toLowerCase() === userAddress.toLowerCase() ? 'You' : shortAddress(recip) }}</span>
+                        <span style="font-weight: 700; color: var(--accent-teal-dark);">{{ job.splits[idx] }}%</span>
+                      </div>
+                    </div>
+                  </div>
+
                   <!-- CCTP Bridged Escrow Details -->
                   <div v-if="job.fundingMethod === 'cross-chain'" style="margin-top: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-family: monospace; background: var(--accent-teal-light); border: 2.5px solid var(--border-color); padding: 10px; border-radius: var(--border-radius-sm);">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -595,6 +637,25 @@
                     <div style="display: flex; gap: 12px; margin-top: 4px;">
                       <a v-if="job.burnTxHash" :href="getTxExplorerUrl(job.sourceChain, job.burnTxHash)" target="_blank" style="color: var(--text-primary); text-decoration: underline; font-weight: 700;">Burn Tx ↗</a>
                       <a v-if="job.mintTxHash" :href="getTxExplorerUrl('Arc_Testnet', job.mintTxHash)" target="_blank" style="color: var(--text-primary); text-decoration: underline; font-weight: 700;">Mint Tx ↗</a>
+                    </div>
+                  </div>
+
+                  <!-- Apply/Join with Team Split Configuration (Feature F) -->
+                  <div style="margin-top: 12px; border-top: 1.5px solid var(--border-color); padding-top: 12px; margin-bottom: 12px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; font-weight: 700; color: var(--text-primary);">
+                      <input type="checkbox" v-model="getJoinSplitConfig(job.id).enable" style="accent-color: var(--accent-teal);" />
+                      Apply/Join with Team Split Payouts
+                    </label>
+                    <div v-if="getJoinSplitConfig(job.id).enable" style="margin-top: 8px; background: var(--bg-secondary); border: 1.5px solid var(--border-color); padding: 10px; border-radius: var(--border-radius-sm);">
+                      <div v-for="(r, idx) in getJoinSplitConfig(job.id).recipients" :key="idx" style="display: flex; gap: 6px; margin-bottom: 6px; align-items: center;">
+                        <input v-model="r.address" type="text" class="form-input" style="flex: 2; padding: 6px 8px; font-size: 11px;" placeholder="Wallet Address (0x...)" required />
+                        <input v-model.number="r.percentage" type="number" class="form-input" style="flex: 1; padding: 6px 8px; font-size: 11px; max-width: 60px;" placeholder="%" min="1" max="100" required />
+                        <button type="button" class="btn btn-danger btn-small" style="padding: 2px 6px; margin: 0; min-height: auto; font-size: 11px;" @click="removeJoinSplitRecipient(job.id, idx)" :disabled="getJoinSplitConfig(job.id).recipients.length === 1">×</button>
+                      </div>
+                      <button type="button" class="btn btn-secondary btn-small" style="margin-top: 4px; padding: 2px 8px; font-size: 11px;" @click="addJoinSplitRecipient(job.id)">+ Add Member</button>
+                      <p style="font-size: 10px; color: var(--text-secondary); margin-top: 6px;">
+                        Set coworker addresses and split ratios. Total splits must sum to exactly 100%.
+                      </p>
                     </div>
                   </div>
 
@@ -644,6 +705,17 @@
                     <div class="gig-meta-item">
                       <span class="gig-meta-label">Current Milestone</span>
                       <span class="gig-meta-value" style="color: var(--accent-teal-dark);">{{ job.currentMilestone + 1 }} / {{ job.milestones.length }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Team Split Ratios Display (Feature F) -->
+                  <div v-if="job.recipients && job.recipients.length > 0" style="margin-top: 15px; background: var(--bg-secondary); border: 2px solid var(--border-color); padding: 12px; border-radius: var(--border-radius-sm); box-shadow: 2px 2px 0px var(--border-color);">
+                    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--accent-purple); margin-bottom: 6px;">👥 Team Split Ratios</div>
+                    <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-family: monospace;">
+                      <div v-for="(recip, idx) in job.recipients" :key="idx" style="display: flex; justify-content: space-between;">
+                        <span>{{ recip.toLowerCase() === userAddress.toLowerCase() ? 'You' : shortAddress(recip) }}</span>
+                        <span style="font-weight: 700; color: var(--accent-teal-dark);">{{ job.splits[idx] }}%</span>
+                      </div>
                     </div>
                   </div>
 
@@ -1870,6 +1942,63 @@ const quoteExpiresInSeconds = ref(0);
 const isRefreshingQuote = ref(false);
 let quoteTimer = null;
 
+// Feature: Multi-Party Splits
+const enableSplits = ref(false);
+const splitRecipients = ref([{ address: '', percentage: 100 }]);
+
+function addSplitRecipient() {
+  splitRecipients.value.push({ address: '', percentage: 0 });
+}
+
+function removeSplitRecipient(index) {
+  if (splitRecipients.value.length > 1) {
+    splitRecipients.value.splice(index, 1);
+  }
+}
+
+// Join job split states (per jobId)
+const joinSplitsConfig = ref({});
+
+function getJoinSplitConfig(jobId) {
+  if (!joinSplitsConfig.value[jobId]) {
+    joinSplitsConfig.value[jobId] = {
+      enable: false,
+      recipients: [{ address: '', percentage: 100 }]
+    };
+  }
+  return joinSplitsConfig.value[jobId];
+}
+
+function addJoinSplitRecipient(jobId) {
+  const config = getJoinSplitConfig(jobId);
+  config.recipients.push({ address: '', percentage: 0 });
+}
+
+function removeJoinSplitRecipient(jobId, index) {
+  const config = getJoinSplitConfig(jobId);
+  if (config.recipients.length > 1) {
+    config.recipients.splice(index, 1);
+  }
+}
+
+function validateSplits(members) {
+  let total = 0;
+  for (const m of members) {
+    if (!m.address || !m.address.startsWith('0x') || m.address.length !== 42) {
+      return { valid: false, error: `Invalid wallet address: ${m.address || 'empty'}` };
+    }
+    const pct = parseInt(m.percentage);
+    if (isNaN(pct) || pct <= 0 || pct > 100) {
+      return { valid: false, error: 'Percentages must be positive integers between 1 and 100.' };
+    }
+    total += pct;
+  }
+  if (total !== 100) {
+    return { valid: false, error: `Total percentage must equal exactly 100% (currently ${total}%).` };
+  }
+  return { valid: true };
+}
+
 function getTxExplorerUrl(chainKey, hash) {
   if (!hash || hash.startsWith('mock_')) return '#';
   if (chainKey === 'Base_Sepolia') return `https://sepolia.basescan.org/tx/${hash}`;
@@ -2414,6 +2543,20 @@ async function createGig() {
     return;
   }
 
+  // Validate Splits if enabled
+  let isSplitMode = enableSplits.value;
+  let recipients = [];
+  let splits = [];
+  if (isSplitMode) {
+    const val = validateSplits(splitRecipients.value);
+    if (!val.valid) {
+      modals.warning('Invalid Split Settings', val.error);
+      return;
+    }
+    recipients = splitRecipients.value.map(r => r.address);
+    splits = splitRecipients.value.map(r => BigInt(r.percentage));
+  }
+
   const contractAddress = systemStatus.value.contractAddress;
   const usdcUnits = parseUnits(newJob.value.budget.toString(), 6);
   const milestoneBudgets = newJob.value.milestones.map(m => parseUnits(m.budget.toString(), 6));
@@ -2455,13 +2598,24 @@ async function createGig() {
         const createRes = await executeSponsoredTransaction({
           walletId: circleUserWallet.value.id,
           contractAddress: contractAddress,
-          abiFunctionSignature: 'createJob(uint256,string,uint256[],string[])',
-          abiParameters: [
-            usdcUnits.toString(),
-            newJob.value.repoUrl,
-            milestoneBudgets.map(b => b.toString()),
-            milestoneTitles
-          ],
+          abiFunctionSignature: isSplitMode 
+            ? 'createJobWithSplits(uint256,string,uint256[],string[],address[],uint256[])'
+            : 'createJob(uint256,string,uint256[],string[])',
+          abiParameters: isSplitMode
+            ? [
+                usdcUnits.toString(),
+                newJob.value.repoUrl,
+                milestoneBudgets.map(b => b.toString()),
+                milestoneTitles,
+                recipients,
+                splits.map(s => s.toString())
+              ]
+            : [
+                usdcUnits.toString(),
+                newJob.value.repoUrl,
+                milestoneBudgets.map(b => b.toString()),
+                milestoneTitles
+              ],
           userToken: circleSessionToken.value,
           userAddress: userAddress.value,
           isSimulation: isSimulationMode.value,
@@ -2475,12 +2629,23 @@ async function createGig() {
           chain: arcTestnet,
           transport: custom(window.ethereum)
         });
-        const createTx = await walletClient.writeContract({
-          address: contractAddress,
-          abi: GIGMARKET_ESCROW_ABI,
-          functionName: 'createJob',
-          args: [usdcUnits, newJob.value.repoUrl, milestoneBudgets, milestoneTitles]
-        });
+        
+        let createTx;
+        if (isSplitMode) {
+          createTx = await walletClient.writeContract({
+            address: contractAddress,
+            abi: GIGMARKET_ESCROW_ABI,
+            functionName: 'createJobWithSplits',
+            args: [usdcUnits, newJob.value.repoUrl, milestoneBudgets, milestoneTitles, recipients, splits]
+          });
+        } else {
+          createTx = await walletClient.writeContract({
+            address: contractAddress,
+            abi: GIGMARKET_ESCROW_ABI,
+            functionName: 'createJob',
+            args: [usdcUnits, newJob.value.repoUrl, milestoneBudgets, milestoneTitles]
+          });
+        }
         await publicClient.waitForTransactionReceipt({ hash: createTx });
         createTxHash = createTx;
       }
@@ -2518,6 +2683,8 @@ async function createGig() {
         burnTxHash: burnRes.burnTxHash,
         mintTxHash: mintTx,
         escrowTxHash: createTxHash,
+        recipients: isSplitMode ? splitRecipients.value.map(r => r.address) : [],
+        splits: isSplitMode ? splitRecipients.value.map(r => parseInt(r.percentage)) : [],
         milestones: newJob.value.milestones.map(m => ({
           title: m.title,
           budget: m.budget,
@@ -2538,6 +2705,8 @@ async function createGig() {
       newJob.value.title = '';
       newJob.value.description = '';
       newJob.value.repoUrl = '';
+      enableSplits.value = false;
+      splitRecipients.value = [{ address: '', percentage: 100 }];
     } catch (e) {
       console.error('CCTP Bridge error:', e);
       bridgeStep.value = -1;
@@ -2571,13 +2740,24 @@ async function createGig() {
       const createRes = await executeSponsoredTransaction({
         walletId: circleUserWallet.value.id,
         contractAddress: contractAddress,
-        abiFunctionSignature: 'createJob(uint256,string,uint256[],string[])',
-        abiParameters: [
-          usdcUnits.toString(),
-          newJob.value.repoUrl,
-          milestoneBudgets.map(b => b.toString()),
-          milestoneTitles
-        ],
+        abiFunctionSignature: isSplitMode
+          ? 'createJobWithSplits(uint256,string,uint256[],string[],address[],uint256[])'
+          : 'createJob(uint256,string,uint256[],string[])',
+        abiParameters: isSplitMode
+          ? [
+              usdcUnits.toString(),
+              newJob.value.repoUrl,
+              milestoneBudgets.map(b => b.toString()),
+              milestoneTitles,
+              recipients,
+              splits.map(s => s.toString())
+            ]
+          : [
+              usdcUnits.toString(),
+              newJob.value.repoUrl,
+              milestoneBudgets.map(b => b.toString()),
+              milestoneTitles
+            ],
         userToken: circleSessionToken.value,
         userAddress: userAddress.value,
         isSimulation: isSimulationMode.value,
@@ -2611,6 +2791,8 @@ async function createGig() {
         status: 'Created',
         currentMilestone: 0,
         fundingMethod: 'arc',
+        recipients: isSplitMode ? splitRecipients.value.map(r => r.address) : [],
+        splits: isSplitMode ? splitRecipients.value.map(r => parseInt(r.percentage)) : [],
         milestones: newJob.value.milestones.map(m => ({
           title: m.title,
           budget: m.budget,
@@ -2629,6 +2811,8 @@ async function createGig() {
       newJob.value.title = '';
       newJob.value.description = '';
       newJob.value.repoUrl = '';
+      enableSplits.value = false;
+      splitRecipients.value = [{ address: '', percentage: 100 }];
     } catch (e) {
       console.error('Circle job posting failed:', e);
       closeModal();
@@ -2665,12 +2849,22 @@ async function createGig() {
     closeModal();
     modals.loading('Funding Escrow Job', 'Step 2 of 2: Authorizing the smart contract secure deposit pool. Confirm the signature request in your wallet...');
     
-    const createTx = await walletClient.writeContract({
-      address: contractAddress,
-      abi: GIGMARKET_ESCROW_ABI,
-      functionName: 'createJob',
-      args: [usdcUnits, newJob.value.repoUrl, milestoneBudgets, milestoneTitles]
-    });
+    let createTx;
+    if (isSplitMode) {
+      createTx = await walletClient.writeContract({
+        address: contractAddress,
+        abi: GIGMARKET_ESCROW_ABI,
+        functionName: 'createJobWithSplits',
+        args: [usdcUnits, newJob.value.repoUrl, milestoneBudgets, milestoneTitles, recipients, splits]
+      });
+    } else {
+      createTx = await walletClient.writeContract({
+        address: contractAddress,
+        abi: GIGMARKET_ESCROW_ABI,
+        functionName: 'createJob',
+        args: [usdcUnits, newJob.value.repoUrl, milestoneBudgets, milestoneTitles]
+      });
+    }
     
     closeModal();
     modals.txPending(createTx, 'Publishing job escrow and locking USDC gasless pools. Awaiting block receipt...');
@@ -2696,6 +2890,8 @@ async function createGig() {
       status: 'Created',
       currentMilestone: 0,
       fundingMethod: 'arc',
+      recipients: isSplitMode ? splitRecipients.value.map(r => r.address) : [],
+      splits: isSplitMode ? splitRecipients.value.map(r => parseInt(r.percentage)) : [],
       milestones: newJob.value.milestones.map(m => ({
         title: m.title,
         budget: m.budget,
@@ -2718,6 +2914,8 @@ async function createGig() {
     newJob.value.title = '';
     newJob.value.description = '';
     newJob.value.repoUrl = '';
+    enableSplits.value = false;
+    splitRecipients.value = [{ address: '', percentage: 100 }];
   } catch (e) {
     console.error('Job posting failed:', e);
     closeModal();
@@ -2733,6 +2931,20 @@ async function joinGig(job) {
     return;
   }
   
+  const config = getJoinSplitConfig(job.id);
+  let isSplitMode = config.enable;
+  let recipients = [];
+  let splits = [];
+  if (isSplitMode) {
+    const val = validateSplits(config.recipients);
+    if (!val.valid) {
+      modals.warning('Invalid Split Settings', val.error);
+      return;
+    }
+    recipients = config.recipients.map(r => r.address);
+    splits = config.recipients.map(r => BigInt(r.percentage));
+  }
+
   const requiredStakeVal = calculateJobRequiredStake(job.budget);
   const stakeUnits = parseUnits(requiredStakeVal, 6);
   const contractAddress = systemStatus.value.contractAddress;
@@ -2761,21 +2973,26 @@ async function joinGig(job) {
       const joinRes = await executeSponsoredTransaction({
         walletId: circleUserWallet.value.id,
         contractAddress: contractAddress,
-        abiFunctionSignature: 'joinJob(uint256)',
-        abiParameters: [job.id.toString()],
+        abiFunctionSignature: isSplitMode
+          ? 'joinJobWithSplits(uint256,address[],uint256[])'
+          : 'joinJob(uint256)',
+        abiParameters: isSplitMode
+          ? [job.id.toString(), recipients, splits.map(s => s.toString())]
+          : [job.id.toString()],
         userToken: circleSessionToken.value,
         userAddress: userAddress.value,
         isSimulation: isSimulationMode.value,
         executeChallengeFn: executeChallenge
       });
-      const joinResult = joinRes;
 
       const updatedJob = {
         ...job,
         status: 'Active',
         freelancer: userAddress.value,
         requiredStake: requiredStakeVal,
-        freelancerStake: requiredStakeVal
+        freelancerStake: requiredStakeVal,
+        recipients: isSplitMode ? config.recipients.map(r => r.address) : [userAddress.value],
+        splits: isSplitMode ? config.recipients.map(r => parseInt(r.percentage)) : [100]
       };
 
       await $fetch('/api/jobs', {
@@ -2826,12 +3043,22 @@ async function joinGig(job) {
     closeModal();
     modals.loading('Registering Contract', 'Submitting registration signature request to joint job escrow pool...');
     
-    const joinTx = await walletClient.writeContract({
-      address: contractAddress,
-      abi: GIGMARKET_ESCROW_ABI,
-      functionName: 'joinJob',
-      args: [BigInt(job.id)]
-    });
+    let joinTx;
+    if (isSplitMode) {
+      joinTx = await walletClient.writeContract({
+        address: contractAddress,
+        abi: GIGMARKET_ESCROW_ABI,
+        functionName: 'joinJobWithSplits',
+        args: [BigInt(job.id), recipients, splits]
+      });
+    } else {
+      joinTx = await walletClient.writeContract({
+        address: contractAddress,
+        abi: GIGMARKET_ESCROW_ABI,
+        functionName: 'joinJob',
+        args: [BigInt(job.id)]
+      });
+    }
     
     closeModal();
     modals.txPending(joinTx, 'Registering your address as project freelancer. locking security collateral...');
@@ -2843,7 +3070,9 @@ async function joinGig(job) {
       status: 'Active',
       freelancer: userAddress.value,
       requiredStake: requiredStakeVal,
-      freelancerStake: requiredStakeVal
+      freelancerStake: requiredStakeVal,
+      recipients: isSplitMode ? config.recipients.map(r => r.address) : [userAddress.value],
+      splits: isSplitMode ? config.recipients.map(r => parseInt(r.percentage)) : [100]
     };
 
     await $fetch('/api/jobs', {
