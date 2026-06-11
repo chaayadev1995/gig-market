@@ -1,5 +1,5 @@
 import { createPublicClient, createWalletClient, http, custom, keccak256, pad } from 'viem';
-import { isSimulationMode } from './circle-wallet';
+import { isSimulationMode, activeWalletProvider } from './circle-wallet';
 
 // CCTP Testnet Contract & Network Configs
 export const BRIDGE_NETWORKS = {
@@ -120,12 +120,13 @@ export async function initiateBurn(sourceChainKey, amount, recipientArcAddress) 
     };
   }
 
-  // Live Mode: Require a browser wallet extension (like MetaMask) connected to source chain
-  if (typeof window === 'undefined' || !window.ethereum) {
-    throw new Error('No browser wallet extension detected.');
+  // Live Mode: Require a browser wallet extension or connected provider
+  const provider = activeWalletProvider.value || (typeof window !== 'undefined' ? window.ethereum : null);
+  if (!provider) {
+    throw new Error('No wallet provider detected. Please connect your wallet first.');
   }
 
-  const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+  const accounts = await provider.request({ method: 'eth_requestAccounts' });
   const userAddress = accounts[0];
 
   const sourceClient = createPublicClient({
@@ -134,14 +135,14 @@ export async function initiateBurn(sourceChainKey, amount, recipientArcAddress) 
 
   const walletClient = createWalletClient({
     account: userAddress,
-    transport: custom(window.ethereum)
+    transport: custom(provider)
   });
 
   // Ensure wallet is connected to correct source chain
   const chainId = await walletClient.getChainId();
   if (chainId !== sourceNetwork.chainId) {
     try {
-      await window.ethereum.request({
+      await provider.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: `0x${sourceNetwork.chainId.toString(16)}` }]
       });

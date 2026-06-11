@@ -1,7 +1,8 @@
 // Contract addresses and ABI constants for GigMarket frontend
 
 export const USDC_TOKEN_ADDRESS = '0x3600000000000000000000000000000000000000';
-export const EURC_TOKEN_ADDRESS = '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a';
+export const EURC_TOKEN_ADDRESS = '0x5fbd38c09c806e3972b4ae669b932190ad91a49f';
+export const STABLE_FX_ROUTER_ADDRESS = '0xc5d96c53c5704395b463a8f2c8c38a682909f935';
 
 // Fallback address in case backend hasn't written it yet
 export const DEFAULT_CONTRACT_ADDRESS = '0x789b9868eE8B750e30743E44d0E7d32C42eBe4d8';
@@ -15,6 +16,16 @@ export const ERC20_ABI = [
     inputs: [
       { name: 'spender', type: 'address' },
       { name: 'value', type: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'bool' }]
+  },
+  {
+    name: 'transfer',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'recipient', type: 'address' },
+      { name: 'amount', type: 'uint256' }
     ],
     outputs: [{ name: '', type: 'bool' }]
   },
@@ -234,6 +245,13 @@ export const GIGMARKET_ESCROW_ABI = [
     stateMutability: 'view',
     inputs: [],
     outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    name: 'owner',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }]
   }
 ];
 

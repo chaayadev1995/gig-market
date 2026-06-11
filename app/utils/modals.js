@@ -33,6 +33,9 @@ export const errorMap = {
   }
 };
 
+// Store close timeout reference globally inside the module
+let closeTimeout = null;
+
 /**
  * Trigger a new modal pop-up. If a modal is already active, queues it automatically.
  */
@@ -57,8 +60,21 @@ export function showModal(config) {
     retryAction: config.retryAction || null, // Optional retry callback flow
   };
 
+  // If a modal close is pending, abort the close animation and transition immediately
+  if (closeTimeout) {
+    clearTimeout(closeTimeout);
+    closeTimeout = null;
+    activeModal.value = modalConfig;
+    return modalConfig.id;
+  }
+
   if (activeModal.value) {
-    modalQueue.value.push(modalConfig);
+    // If the active modal is a loading modal, replace it immediately to avoid timing clashing
+    if (activeModal.value.type === 'loading') {
+      activeModal.value = modalConfig;
+    } else {
+      modalQueue.value.push(modalConfig);
+    }
   } else {
     activeModal.value = modalConfig;
   }
@@ -83,9 +99,15 @@ export function closeModal() {
     }
   }
 
+  if (closeTimeout) {
+    clearTimeout(closeTimeout);
+    closeTimeout = null;
+  }
+
   // Brief delay to match the transition fadeOut/slideDown exit animation
-  setTimeout(() => {
+  closeTimeout = setTimeout(() => {
     activeModal.value = null;
+    closeTimeout = null;
     if (modalQueue.value.length > 0) {
       activeModal.value = modalQueue.value.shift();
     }
@@ -216,6 +238,11 @@ export const modals = {
     preventClose: true,
     primaryLabel: 'View on Explorer ↗',
     secondaryLabel: '', // Do not let user cancel during mining
+    onConfirm: () => {
+      if (txHash && txHash !== 'Pending') {
+        window.open(`https://testnet.arcscan.app/tx/${txHash}`, '_blank');
+      }
+    }
   }),
 
   txSuccess: (txHash, message = 'Transaction successfully validated. Your on-chain state update is complete.') => showModal({

@@ -1869,8 +1869,14 @@
               <!-- Connecting state -->
               <div v-if="isConnectingWallet" style="display: flex; flex-direction: column; align-items: center;">
                 <div class="spinner-circle"></div>
-                <h4 class="wallet-status-title">Requesting Connection</h4>
-                <p class="wallet-status-desc">Please accept the connection request in your browser extension to proceed.</p>
+                <h4 class="wallet-status-title">
+                  {{ selectedWallet === 'circle' ? 'Authenticating Session' : 'Requesting Connection' }}
+                </h4>
+                <p class="wallet-status-desc">
+                  {{ selectedWallet === 'circle'
+                      ? 'Establishing connection to secure enclave, please wait...'
+                      : 'Please accept the connection request in your browser extension to proceed.' }}
+                </p>
               </div>
 
               <!-- Error State -->
@@ -1962,49 +1968,50 @@
 
               <!-- Rainbow Wallet view -->
               <div v-else-if="selectedWallet === 'rainbow'">
-                <div class="wallet-qr-code">
-                  <svg viewBox="0 0 100 100" width="120" height="120" style="fill: #1A1A1A;">
-                    <rect x="0" y="0" width="20" height="20" />
-                    <rect x="80" y="0" width="20" height="20" />
-                    <rect x="0" y="80" width="20" height="20" />
-                    <rect x="40" y="20" width="10" height="10" />
-                    <rect x="60" y="40" width="20" height="10" />
-                    <rect x="20" y="60" width="10" height="20" />
-                    <rect x="50" y="80" width="20" height="10" />
+                <div style="width: 80px; height: 80px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; background: #000; border-radius: 16px;">
+                  <svg viewBox="0 0 32 32" width="56" height="56">
+                    <circle cx="16" cy="16" r="14" fill="#000" />
+                    <path d="M16 4a12 12 0 0 1 12 12H16V4z" fill="#FF1E56" />
+                    <path d="M16 16h12a12 12 0 0 1-12 12V16z" fill="#FFAC41" />
+                    <path d="M16 16v12A12 12 0 0 1 4 16h12z" fill="#3282B8" />
+                    <path d="M4 16A12 12 0 0 1 16 4v12H4z" fill="#00E2C6" />
                   </svg>
                 </div>
-                <h4 class="wallet-status-title">Scan with Rainbow</h4>
-                <p class="wallet-status-desc">Open the Rainbow mobile app and scan the QR code to connect instantly.</p>
+                <h4 class="wallet-status-title">Rainbow Wallet</h4>
+                <p class="wallet-status-desc">Connect using the Rainbow browser extension or scan a secure QR code using the mobile app.</p>
+                <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                  <button class="btn btn-primary" style="margin: 0;" @click="triggerBrowserConnection">Connect Extension</button>
+                  <button class="btn btn-secondary" style="margin: 0;" @click="triggerWalletConnectConnection">Scan QR / Connect Mobile</button>
+                </div>
               </div>
 
               <!-- Coinbase Wallet view -->
               <div v-else-if="selectedWallet === 'coinbase'">
-                <div style="width: 80px; height: 80px; margin: 0 auto 16px;">
-                  <svg viewBox="0 0 32 32" width="80" height="80">
+                <div style="width: 80px; height: 80px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; background: #0052FF; border-radius: 16px;">
+                  <svg viewBox="0 0 32 32" width="56" height="56">
                     <circle cx="16" cy="16" r="13" fill="#0052FF" />
                     <rect x="9" y="9" width="14" height="14" rx="2" fill="#FFFFFF" />
                   </svg>
                 </div>
                 <h4 class="wallet-status-title">Coinbase Wallet</h4>
-                <p class="wallet-status-desc">Sign in using Coinbase Wallet browser extension or connect via the mobile application.</p>
-                <button class="btn btn-primary" @click="triggerBrowserConnection">Connect Extension</button>
+                <p class="wallet-status-desc">Connect using the Coinbase Wallet browser extension or scan a secure QR code using the mobile app.</p>
+                <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                  <button class="btn btn-primary" style="margin: 0;" @click="triggerBrowserConnection">Connect Extension</button>
+                  <button class="btn btn-secondary" style="margin: 0;" @click="triggerWalletConnectConnection">Scan QR / Connect Mobile</button>
+                </div>
               </div>
 
               <!-- WalletConnect view -->
               <div v-else-if="selectedWallet === 'walletconnect'">
-                <div class="wallet-qr-code">
-                  <svg viewBox="0 0 100 100" width="120" height="120" style="fill: #3B99FC;">
-                    <rect x="0" y="0" width="20" height="20" />
-                    <rect x="80" y="0" width="20" height="20" />
-                    <rect x="0" y="80" width="20" height="20" />
-                    <rect x="30" y="30" width="20" height="20" />
-                    <rect x="60" y="60" width="20" height="10" />
-                    <rect x="20" y="10" width="10" height="10" />
-                    <rect x="70" y="20" width="10" height="10" />
+                <div style="width: 80px; height: 80px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; background: #3B99FC; border-radius: 16px;">
+                  <svg viewBox="0 0 32 32" width="56" height="56">
+                    <path d="M23 10.5c-3.8-3.8-10.2-3.8-14 0L4 15.5c.3.3.8.3 1.1 0l3.8-3.8c3.2-3.2 8.4-3.2 11.6 0l3.8 3.8c.3.3.8.3 1.1 0l-2.4-2.5-2.4-2.5z" fill="#FFF"/>
+                    <path d="M10.5 17c-3-3-8 3-4.5 6.5l3.8-3.8c.3-.3.8-.3 1.1 0l3.8 3.8c3.5-3.5-1.5-9.5-4.2-6.5z" fill="#FFF"/>
                   </svg>
                 </div>
-                <h4 class="wallet-status-title">Scan QR Code</h4>
-                <p class="wallet-status-desc">Scan with any WalletConnect-compatible wallet to establish session.</p>
+                <h4 class="wallet-status-title">WalletConnect</h4>
+                <p class="wallet-status-desc">Connect your secure mobile wallet (MetaMask, Trust, Ledger, etc.) by scanning the QR code.</p>
+                <button class="btn btn-primary" @click="triggerWalletConnectConnection">Launch QR Modal</button>
               </div>
             </div>
           </div>
@@ -2134,7 +2141,7 @@
       </div>
 
       <!-- Universal Centralized Modal Overlay -->
-      <div v-if="activeModal" class="wallet-modal-overlay" @click.self="handleBackdropClick" :style="{ pointerEvents: activeModal.preventClose ? 'none' : 'auto' }">
+      <div v-if="activeModal" class="wallet-modal-overlay" @click.self="handleBackdropClick" style="pointer-events: auto;">
         <div class="wallet-modal-container universal-modal-container" style="max-width: 440px;">
           <!-- Header -->
           <div class="wallet-modal-header universal-modal-header" style="padding: 16px 20px;">
@@ -2328,13 +2335,74 @@
 
 <script setup>
 import { ref, onMounted, computed, onUnmounted } from 'vue';
+
+// --- CIRCLE CORS INTERCEPTOR ---
+// Intercept fetch calls to strip X-User-Agent / x-user-agent header which is blocked by Circle API's CORS policy
+if (typeof window !== 'undefined') {
+  const originalFetch = window.fetch;
+  window.fetch = async function (input, init) {
+    let url = '';
+    if (typeof input === 'string') {
+      url = input;
+    } else if (input instanceof URL) {
+      url = input.href;
+    } else if (input && typeof input === 'object' && 'url' in input) {
+      url = input.url;
+    }
+
+    if (url.includes('api.circle.com') || url.includes('api-sandbox.circle.com')) {
+      console.log('[Fetch Interceptor] Intercepting request to Circle API:', url);
+      if (init) {
+        if (init.headers) {
+          if (init.headers instanceof Headers) {
+            if (init.headers.has('x-user-agent')) {
+              init.headers.delete('x-user-agent');
+              console.log('[Fetch Interceptor] Removed x-user-agent from Headers object');
+            }
+          } else if (Array.isArray(init.headers)) {
+            const index = init.headers.findIndex(h => h[0].toLowerCase() === 'x-user-agent');
+            if (index !== -1) {
+              init.headers.splice(index, 1);
+              console.log('[Fetch Interceptor] Removed x-user-agent from Headers array');
+            }
+          } else if (typeof init.headers === 'object') {
+            for (const key of Object.keys(init.headers)) {
+              if (key.toLowerCase() === 'x-user-agent') {
+                delete init.headers[key];
+                console.log(`[Fetch Interceptor] Removed ${key} from Headers object`);
+              }
+            }
+          }
+        }
+      } else if (input && typeof input === 'object' && 'headers' in input) {
+        const headers = input.headers;
+        if (headers instanceof Headers) {
+          if (headers.has('x-user-agent')) {
+            headers.delete('x-user-agent');
+            console.log('[Fetch Interceptor] Removed x-user-agent from Request headers');
+          }
+        } else if (typeof headers === 'object') {
+          for (const key of Object.keys(headers)) {
+            if (key.toLowerCase() === 'x-user-agent') {
+              delete headers[key];
+              console.log(`[Fetch Interceptor] Removed ${key} from Request headers`);
+            }
+          }
+        }
+      }
+    }
+    return originalFetch.apply(this, arguments);
+  };
+}
+
 import { createPublicClient, createWalletClient, http, custom, parseUnits, formatUnits } from 'viem';
 import { 
   GIGMARKET_ESCROW_ABI, 
   AGENT_ESCROW_8183_ABI,
   ERC20_ABI, 
   USDC_TOKEN_ADDRESS, 
-  EURC_TOKEN_ADDRESS 
+  EURC_TOKEN_ADDRESS,
+  STABLE_FX_ROUTER_ADDRESS 
 } from './utils/contract';
 import { activeModal, closeModal, modals, handleError } from './utils/modals';
 import {
@@ -2350,6 +2418,7 @@ import {
   circleAppId,
   circleUserId,
   isSimulationMode,
+  activeWalletProvider,
   initCircleSdk,
   executeChallenge,
   checkPersistedWallet,
@@ -2366,6 +2435,12 @@ import {
   pollBridgeAttestation,
   mintOnArc
 } from './utils/bridge-kit';
+
+const userAddress = ref('');
+
+function getProvider() {
+  return activeWalletProvider.value || (typeof window !== 'undefined' ? window.ethereum : null);
+}
 
 const circleEmail = ref('');
 const showPinScreen = ref(false);
@@ -2385,7 +2460,7 @@ const newAgentJob = ref({
   amount: 50,
   expiryDays: 2,
   codeUrl: 'https://raw.githubusercontent.com/owner/repo/main/code.js',
-  repoUrl: 'github.com/agent-factory/erc8183-agent'
+  repoUrl: 'github.com/chaayadev1995/gig-market'
 });
 
 const activeAgentJobId = ref(null);
@@ -2419,69 +2494,132 @@ async function createAgentJob() {
       transport: http(),
     });
 
-    const web3Provider = window.ethereum;
-    if (!web3Provider) {
-      throw new Error('No web3 provider found (Metamask required for client transactions)');
-    }
-
-    const walletClient = createWalletClient({
-      account: userAddress.value,
-      chain: arcTestnet,
-      transport: custom(web3Provider),
-    });
-
     const usdcUnits = parseUnits(newAgentJob.value.amount.toString(), 6);
     const expiryTimestamp = Math.floor(Date.now() / 1000) + (newAgentJob.value.expiryDays * 24 * 60 * 60);
 
-    // 1. Approve USDC spend
-    modals.info('Approving USDC', 'Please sign the USDC approval transaction in your browser wallet.');
-    
-    const approveHash = await walletClient.writeContract({
-      address: USDC_TOKEN_ADDRESS,
-      abi: ERC20_ABI,
-      functionName: 'approve',
-      args: [contractAddress, usdcUnits],
-    });
-    
-    await publicClient.waitForTransactionReceipt({ hash: approveHash });
-    
-    // 2. Create Job
-    modals.info('Creating Job', 'Please confirm the job creation transaction.');
-    
-    const createHash = await walletClient.writeContract({
-      address: contractAddress,
-      abi: AGENT_ESCROW_8183_ABI,
-      functionName: 'createJob',
-      args: [
-        newAgentJob.value.provider || systemStatus.value.walletAddress,
-        newAgentJob.value.evaluator || systemStatus.value.walletAddress,
-        USDC_TOKEN_ADDRESS,
-        usdcUnits,
-        BigInt(expiryTimestamp)
-      ],
-    });
+    let jobId = 0;
+    let createHash = '';
 
-    const createReceipt = await publicClient.waitForTransactionReceipt({ hash: createHash });
-    console.log('Job created receipt:', createReceipt);
+    if (circleUserWallet.value) {
+      // 1. Approve USDC spend
+      modals.loading('Approving USDC', 'Approving USDC budget allocation (Gasless Sponsored Transaction)...');
+      await executeSponsoredTransaction({
+        walletId: circleUserWallet.value.id,
+        contractAddress: USDC_TOKEN_ADDRESS,
+        abiFunctionSignature: 'approve(address,uint256)',
+        abiParameters: [contractAddress, usdcUnits.toString()],
+        userToken: circleSessionToken.value,
+        userAddress: userAddress.value,
+        isSimulation: isSimulationMode.value,
+        executeChallengeFn: executeChallenge
+      });
 
-    // Fetch jobCount
-    const jobCount = await publicClient.readContract({
-      address: contractAddress,
-      abi: AGENT_ESCROW_8183_ABI,
-      functionName: 'jobCount',
-    });
-    const jobId = Number(jobCount);
+      // 2. Create Job
+      modals.loading('Creating Job', 'Creating agentic escrow job (Gasless Sponsored Transaction)...');
+      const createRes = await executeSponsoredTransaction({
+        walletId: circleUserWallet.value.id,
+        contractAddress: contractAddress,
+        abiFunctionSignature: 'createJob(address,address,address,uint256,uint256)',
+        abiParameters: [
+          newAgentJob.value.provider || systemStatus.value.walletAddress,
+          newAgentJob.value.evaluator || systemStatus.value.walletAddress,
+          USDC_TOKEN_ADDRESS,
+          usdcUnits.toString(),
+          expiryTimestamp.toString()
+        ],
+        userToken: circleSessionToken.value,
+        userAddress: userAddress.value,
+        isSimulation: isSimulationMode.value,
+        executeChallengeFn: executeChallenge
+      });
+      createHash = createRes.txHash || 'Pending';
 
-    // 3. Fund Job
-    modals.info('Funding Job', 'Confirm funding the escrow budget.');
+      // Fetch jobCount
+      if (!isSimulationMode.value) {
+        const jobCount = await publicClient.readContract({
+          address: contractAddress,
+          abi: AGENT_ESCROW_8183_ABI,
+          functionName: 'jobCount',
+        });
+        jobId = Number(jobCount);
+      } else {
+        jobId = jobsList.value.length + 1;
+      }
 
-    const fundHash = await walletClient.writeContract({
-      address: contractAddress,
-      abi: AGENT_ESCROW_8183_ABI,
-      functionName: 'fundJob',
-      args: [BigInt(jobId)],
-    });
-    await publicClient.waitForTransactionReceipt({ hash: fundHash });
+      // 3. Fund Job
+      modals.loading('Funding Job', 'Securing budget deposit in agentic escrow (Gasless Sponsored Transaction)...');
+      const fundRes = await executeSponsoredTransaction({
+        walletId: circleUserWallet.value.id,
+        contractAddress: contractAddress,
+        abiFunctionSignature: 'fundJob(uint256)',
+        abiParameters: [jobId.toString()],
+        userToken: circleSessionToken.value,
+        userAddress: userAddress.value,
+        isSimulation: isSimulationMode.value,
+        executeChallengeFn: executeChallenge
+      });
+    } else {
+      const web3Provider = getProvider();
+      if (!web3Provider) {
+        throw new Error('No web3 provider found (Metamask required for client transactions)');
+      }
+
+      const walletClient = createWalletClient({
+        account: userAddress.value,
+        chain: arcTestnet,
+        transport: custom(web3Provider),
+      });
+
+      // 1. Approve USDC spend
+      modals.info('Approving USDC', 'Please sign the USDC approval transaction in your browser wallet.');
+      
+      const approveHash = await walletClient.writeContract({
+        address: USDC_TOKEN_ADDRESS,
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [contractAddress, usdcUnits],
+      });
+      
+      await publicClient.waitForTransactionReceipt({ hash: approveHash });
+      
+      // 2. Create Job
+      modals.info('Creating Job', 'Please confirm the job creation transaction.');
+      
+      createHash = await walletClient.writeContract({
+        address: contractAddress,
+        abi: AGENT_ESCROW_8183_ABI,
+        functionName: 'createJob',
+        args: [
+          newAgentJob.value.provider || systemStatus.value.walletAddress,
+          newAgentJob.value.evaluator || systemStatus.value.walletAddress,
+          USDC_TOKEN_ADDRESS,
+          usdcUnits,
+          BigInt(expiryTimestamp)
+        ],
+      });
+
+      const createReceipt = await publicClient.waitForTransactionReceipt({ hash: createHash });
+      console.log('Job created receipt:', createReceipt);
+
+      // Fetch jobCount
+      const jobCount = await publicClient.readContract({
+        address: contractAddress,
+        abi: AGENT_ESCROW_8183_ABI,
+        functionName: 'jobCount',
+      });
+      jobId = Number(jobCount);
+
+      // 3. Fund Job
+      modals.info('Funding Job', 'Confirm funding the escrow budget.');
+
+      const fundHash = await walletClient.writeContract({
+        address: contractAddress,
+        abi: AGENT_ESCROW_8183_ABI,
+        functionName: 'fundJob',
+        args: [BigInt(jobId)],
+      });
+      await publicClient.waitForTransactionReceipt({ hash: fundHash });
+    }
 
     // 4. Save to local DB
     const newJobDb = {
@@ -2719,6 +2857,118 @@ async function depositToGateway() {
   }
   isProcessingGatewayDeposit.value = true;
   try {
+    const recipient = systemStatus.value?.walletAddress;
+    if (!recipient) {
+      throw new Error('System platform wallet address not loaded.');
+    }
+
+    const usdcUnits = parseUnits(gatewayDepositAmount.value.toString(), 6);
+    let txHash = '';
+    let confirmed = false;
+    let receipt = null;
+
+    if (circleUserWallet.value) {
+      closeModal();
+      modals.loading('Depositing to Gateway', 'Securing deposit in gateway (Gasless Sponsored Transaction)...');
+      const res = await executeSponsoredTransaction({
+        walletId: circleUserWallet.value.id,
+        contractAddress: USDC_TOKEN_ADDRESS,
+        abiFunctionSignature: 'transfer(address,uint256)',
+        abiParameters: [recipient, usdcUnits.toString()],
+        userToken: circleSessionToken.value,
+        userAddress: userAddress.value,
+        isSimulation: isSimulationMode.value,
+        executeChallengeFn: executeChallenge
+      });
+      txHash = res.txHash;
+      if (isSimulationMode.value) {
+        confirmed = true;
+        receipt = { status: 'success' };
+      }
+    } else if (!isSimulationMode.value) {
+      const web3Provider = getProvider();
+      if (!web3Provider) {
+        throw new Error('No compatible EIP-1193 wallet provider found. Please connect your browser wallet.');
+      }
+
+      modals.loading('Depositing to Gateway', 'Please sign the USDC transfer transaction in your wallet...');
+
+      const walletClient = createWalletClient({
+        account: userAddress.value,
+        chain: arcTestnet,
+        transport: custom(web3Provider),
+      });
+
+      const publicClient = createPublicClient({
+        chain: arcTestnet,
+        transport: http('https://rpc.testnet.arc.network'),
+      });
+
+      let gasOptions = {};
+      try {
+        const fees = await publicClient.estimateFeesPerGas();
+        if (fees && fees.maxFeePerGas) {
+          // Multiply maxFeePerGas and maxPriorityFeePerGas by 1.5x to guarantee instant processing
+          gasOptions.maxFeePerGas = (fees.maxFeePerGas * 15n) / 10n;
+          if (fees.maxPriorityFeePerGas) {
+            gasOptions.maxPriorityFeePerGas = (fees.maxPriorityFeePerGas * 15n) / 10n;
+          }
+        }
+      } catch (gasErr) {
+        console.warn('Failed to estimate gas fees, using defaults:', gasErr);
+      }
+
+      try {
+        const estimatedGas = await publicClient.estimateContractGas({
+          address: USDC_TOKEN_ADDRESS,
+          abi: ERC20_ABI,
+          functionName: 'transfer',
+          args: [recipient, usdcUnits],
+          account: userAddress.value,
+        });
+        // Add 20% buffer to gas limit
+        gasOptions.gas = (estimatedGas * 12n) / 10n;
+      } catch (limitErr) {
+        console.warn('Failed to estimate gas limit, using defaults:', limitErr);
+      }
+
+      txHash = await walletClient.writeContract({
+        address: USDC_TOKEN_ADDRESS,
+        abi: ERC20_ABI,
+        functionName: 'transfer',
+        args: [recipient, usdcUnits],
+        ...gasOptions,
+      });
+    }
+
+    if (txHash && !confirmed) {
+      closeModal();
+      modals.txPending(txHash, 'Waiting for USDC deposit confirmation on-chain...');
+
+      const publicClient = createPublicClient({
+        chain: arcTestnet,
+        transport: http('https://rpc.testnet.arc.network'),
+      });
+
+      // Poll every 2 seconds for a max of 30 times (60 seconds total)
+      for (let i = 0; i < 30; i++) {
+        try {
+          receipt = await publicClient.getTransactionReceipt({ hash: txHash });
+          if (receipt) {
+            confirmed = true;
+            break;
+          }
+        } catch (e) {
+          // ignore indexing errors
+        }
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+
+      if (!confirmed || !receipt) {
+        throw new Error('Transaction confirmation timed out. Please check if your balance was deducted and refresh.');
+      }
+    }
+
     const res = await $fetch('/api/nanopay-settle', {
       method: 'POST',
       body: {
@@ -2727,12 +2977,17 @@ async function depositToGateway() {
         amount: gatewayDepositAmount.value
       }
     });
+    
+    closeModal();
     if (res.success) {
       modals.success('Deposit Successful', res.message);
       await refreshGatewayProfile();
       await fetchUserBlockchainDetails();
+    } else {
+      modals.error('Deposit Failed', res.message || 'Failed to settle deposit.');
     }
   } catch (error) {
+    closeModal();
     modals.error('Deposit Failed', error.data?.error || error.message);
   } finally {
     isProcessingGatewayDeposit.value = false;
@@ -2831,11 +3086,20 @@ async function runGitActionSimulation() {
     }
     
     // 2. Parse 402 Headers
-    const headers = errorResponse.headers;
-    const challenge = headers.get('x-402-challenge');
-    const price = headers.get('x-402-price') || '0.05';
-    const recipient = headers.get('x-402-recipient');
-    const token = headers.get('x-402-token');
+    const headers = errorResponse.response?.headers;
+    if (!headers) {
+      throw new Error('No response headers found in HTTP 402 response.');
+    }
+    const getHeader = (name) => {
+      if (typeof headers.get === 'function') {
+        return headers.get(name);
+      }
+      return headers[name] || headers[name.toLowerCase()];
+    };
+    const challenge = getHeader('x-402-challenge');
+    const price = getHeader('x-402-price') || '0.05';
+    const recipient = getHeader('x-402-recipient');
+    const token = getHeader('x-402-token');
     
     addPlaygroundLog(`🛑 Received HTTP 402: Payment Required.`);
     addPlaygroundLog(`🏷️ Billed Price: ${price} USDC`);
@@ -2843,20 +3107,27 @@ async function runGitActionSimulation() {
     addPlaygroundLog(`✍️ Requesting cryptographic signature from client wallet...`);
     
     // 3. Cryptographically Sign challenge
-    const web3Provider = window.ethereum;
-    if (!web3Provider) {
-      throw new Error('No compatible EIP-1193 wallet provider found for signing.');
+    let signature;
+    if (circleUserWallet.value) {
+      addPlaygroundLog(`[CircleUCW] Generating simulated signature for User-Controlled Smart Wallet...`);
+      signature = '0x_mock_sig_' + Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join('');
+      await new Promise(resolve => setTimeout(resolve, 800));
+    } else {
+      const web3Provider = getProvider();
+      if (!web3Provider) {
+        throw new Error('No compatible EIP-1193 wallet provider found for signing.');
+      }
+      
+      const walletClient = createWalletClient({
+        account: userAddress.value,
+        chain: arcTestnet,
+        transport: custom(web3Provider),
+      });
+      
+      signature = await walletClient.signMessage({
+        message: challenge
+      });
     }
-    
-    const walletClient = createWalletClient({
-      account: userAddress.value,
-      chain: arcTestnet,
-      transport: custom(web3Provider),
-    });
-    
-    const signature = await walletClient.signMessage({
-      message: challenge
-    });
     
     addPlaygroundLog(`🔑 Signature generated: ${signature.slice(0, 24)}...`);
     addPlaygroundLog(`🔄 Resubmitting request with payment authorization headers...`);
@@ -2996,7 +3267,6 @@ async function decryptJob(job) {
 }
 
 // States
-const userAddress = ref('');
 const freelancerReputation = ref(0);
 const userIsJuror = ref(false);
 const jurorReputationScore = ref(100);
@@ -3154,8 +3424,8 @@ async function handleCircleLogin() {
         response.isSimulation
       );
       userAddress.value = wallet.address;
-      await fetchUserBlockchainDetails();
       closeWalletModal();
+      fetchUserBlockchainDetails().catch(e => console.warn('Background check failed:', e));
       modals.success('Welcome Back!', `Successfully authenticated. Wallet: ${shortAddress(wallet.address)}`);
     }
   } catch (e) {
@@ -3181,15 +3451,37 @@ async function submitPinSetup() {
         blockchain: 'ETH-SEPOLIA'
       };
     } else {
-      // Re-fetch wallets via session API
-      const response = await $fetch('/api/circle-wallet-session', {
-        method: 'POST',
-        body: { userId: circleEmail.value }
-      });
-      if (response.success && response.wallets && response.wallets.length > 0) {
-        wallet = response.wallets[0];
-      } else {
-        throw new Error('Wallet not found after initialization challenge');
+      // Poll wallets via session API since wallet creation is asynchronous (IN_PROGRESS)
+      console.log('[CircleUCW] Wallet creation is IN_PROGRESS. Polling backend for active wallets...');
+      
+      const maxAttempts = 15;
+      const delayMs = 2000;
+      
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        console.log(`[CircleUCW] Polling attempt ${attempt}/${maxAttempts}...`);
+        
+        try {
+          const response = await $fetch('/api/circle-wallet-session', {
+            method: 'POST',
+            body: { userId: circleEmail.value, queryOnly: true }
+          });
+          
+          if (response.success && response.wallets && response.wallets.length > 0) {
+            wallet = response.wallets[0];
+            console.log('[CircleUCW] Wallet found:', wallet);
+            break;
+          }
+        } catch (pollErr) {
+          console.warn(`[CircleUCW] Poll attempt ${attempt} failed:`, pollErr);
+        }
+        
+        if (attempt < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      }
+      
+      if (!wallet) {
+        throw new Error('Wallet creation is taking longer than expected. Please close this modal and click "Connect" again in a few seconds to load your wallet.');
       }
     }
 
@@ -3214,6 +3506,7 @@ async function submitPinSetup() {
     isInitializingWallet.value = false;
     showPinScreen.value = false;
     tempSessionData.value = null;
+    closeModal();
   }
 }
 
@@ -3226,8 +3519,16 @@ function closeConnectedModal() {
   isConnectedModalOpen.value = false;
 }
 
-function disconnectWallet() {
+async function disconnectWallet() {
+  if (activeWalletProvider.value && typeof activeWalletProvider.value.disconnect === 'function') {
+    try {
+      await activeWalletProvider.value.disconnect();
+    } catch (e) {
+      console.warn('Error disconnecting provider session:', e);
+    }
+  }
   userAddress.value = '';
+  activeWalletProvider.value = null;
   userUsdcBalance.value = '0.00';
   userEurcBalance.value = '0.00';
   clearWalletState();
@@ -3303,16 +3604,44 @@ onMounted(async () => {
   if (circleUserWallet.value) {
     userAddress.value = circleUserWallet.value.address;
     await fetchUserBlockchainDetails();
-  } else if (window.ethereum) {
-    // 2. Fall back to browser extension auto-connect
+  } else {
+    // 2. Fall back to WalletConnect or browser extension auto-connect
     try {
-      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-      if (accounts.length > 0) {
-        userAddress.value = accounts[0];
-        await fetchUserBlockchainDetails();
+      const { EthereumProvider } = await import('@walletconnect/ethereum-provider');
+      const provider = await EthereumProvider.init({
+        projectId: '3fcc6bba6f1de962d911bb5b5c3dba68',
+        showQrModal: false,
+        chains: [5042002]
+      });
+      if (provider.session) {
+        const accounts = await provider.request({ method: 'eth_accounts' });
+        if (accounts.length > 0) {
+          userAddress.value = accounts[0];
+          activeWalletProvider.value = provider;
+          await fetchUserBlockchainDetails();
+        }
+      } else if (window.ethereum) {
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accounts.length > 0) {
+          userAddress.value = accounts[0];
+          activeWalletProvider.value = window.ethereum;
+          await fetchUserBlockchainDetails();
+        }
       }
     } catch (e) {
-      console.error('Auto connection failed:', e);
+      console.warn('WalletConnect/Extension auto-connect failed:', e);
+      if (window.ethereum) {
+        try {
+          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+          if (accounts.length > 0) {
+            userAddress.value = accounts[0];
+            activeWalletProvider.value = window.ethereum;
+            await fetchUserBlockchainDetails();
+          }
+        } catch (err) {
+          console.error('Extension auto-connect fallback failed:', err);
+        }
+      }
     }
   }
 
@@ -3401,7 +3730,7 @@ async function updatePayoutCurrencyPreference(job) {
       const walletClient = createWalletClient({
         account: userAddress.value,
         chain: arcTestnet,
-        transport: custom(window.ethereum)
+        transport: custom(getProvider())
       });
       const tx = await walletClient.writeContract({
         address: contractAddress,
@@ -3628,21 +3957,68 @@ async function connectWallet() {
   openWalletModal();
 }
 
+function getInjectedProvider(walletKey) {
+  if (typeof window === 'undefined') return null;
+  if (!window.ethereum) return null;
+  
+  if (walletKey === 'metamask') {
+    return window.ethereum.providers?.find(p => p.isMetaMask) || (window.ethereum.isMetaMask ? window.ethereum : window.ethereum);
+  }
+  if (walletKey === 'coinbase') {
+    return window.coinbaseWalletExtension || window.ethereum.providers?.find(p => p.isCoinbaseWallet) || (window.ethereum.isCoinbaseWallet ? window.ethereum : window.ethereum);
+  }
+  if (walletKey === 'rainbow') {
+    return window.rainbowInstance || window.ethereum.providers?.find(p => p.isRainbow) || (window.ethereum.isRainbow ? window.ethereum : window.ethereum);
+  }
+  return window.ethereum;
+}
+
 async function triggerBrowserConnection() {
-  if (!window.ethereum) {
-    walletConnectionError.value = 'No EVM browser extension detected. Please install MetaMask or Coinbase Wallet.';
+  const provider = getInjectedProvider(selectedWallet.value);
+  if (!provider) {
+    walletConnectionError.value = `${selectedWallet.value === 'metamask' ? 'MetaMask' : selectedWallet.value === 'coinbase' ? 'Coinbase Wallet' : 'Rainbow Wallet'} extension not detected.`;
     return;
   }
   isConnectingWallet.value = true;
   walletConnectionError.value = '';
   try {
-    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    const accounts = await provider.request({ method: 'eth_requestAccounts' });
     userAddress.value = accounts[0];
-    await fetchUserBlockchainDetails();
+    activeWalletProvider.value = provider;
     closeWalletModal();
+    fetchUserBlockchainDetails().catch(e => console.warn('Background check failed:', e));
   } catch (e) {
     console.error('Wallet connection error:', e);
     walletConnectionError.value = e.message || 'User rejected connection request.';
+  } finally {
+    isConnectingWallet.value = false;
+  }
+}
+
+async function triggerWalletConnectConnection() {
+  isConnectingWallet.value = true;
+  walletConnectionError.value = '';
+  try {
+    const { EthereumProvider } = await import('@walletconnect/ethereum-provider');
+    const provider = await EthereumProvider.init({
+      projectId: '3fcc6bba6f1de962d911bb5b5c3dba68',
+      showQrModal: true,
+      chains: [5042002], // Arc Testnet
+      optionalChains: [1, 8453, 42161],
+      methods: ["eth_sendTransaction", "personal_sign", "eth_signTypedData_v4"],
+      events: ["chainChanged", "accountsChanged"]
+    });
+
+    await provider.connect();
+
+    const accounts = await provider.request({ method: 'eth_accounts' });
+    userAddress.value = accounts[0];
+    activeWalletProvider.value = provider;
+    closeWalletModal();
+    fetchUserBlockchainDetails().catch(e => console.warn('Background check failed:', e));
+  } catch (e) {
+    console.error('WalletConnect connection error:', e);
+    walletConnectionError.value = e.message || 'Connection request was closed or rejected.';
   } finally {
     isConnectingWallet.value = false;
   }
@@ -3797,7 +4173,7 @@ async function createGig() {
         const walletClient = createWalletClient({
           account: userAddress.value,
           chain: arcTestnet,
-          transport: custom(window.ethereum)
+          transport: custom(getProvider())
         });
 
         const approveTx = await walletClient.writeContract({
@@ -3958,7 +4334,7 @@ async function createGig() {
         const walletClient = createWalletClient({
           account: userAddress.value,
           chain: arcTestnet,
-          transport: custom(window.ethereum)
+          transport: custom(getProvider())
         });
         
         let createTx;
@@ -4161,7 +4537,7 @@ async function createGig() {
     const walletClient = createWalletClient({
       account: userAddress.value,
       chain: arcTestnet,
-      transport: custom(window.ethereum)
+      transport: custom(getProvider())
     });
 
     // 1. Approve USDC transfer
@@ -4321,7 +4697,7 @@ async function joinGig(job) {
         const walletClient = createWalletClient({
           account: userAddress.value,
           chain: arcTestnet,
-          transport: custom(window.ethereum)
+          transport: custom(getProvider())
         });
 
         if (stakeUnits > 0n) {
@@ -4464,7 +4840,7 @@ async function joinGig(job) {
     const walletClient = createWalletClient({
       account: userAddress.value,
       chain: arcTestnet,
-      transport: custom(window.ethereum)
+      transport: custom(getProvider())
     });
 
     // 1. Approve USDC if stake > 0
@@ -4600,7 +4976,7 @@ async function payoutMilestone(jobId, milestoneIndex) {
         const walletClient = createWalletClient({
           account: userAddress.value,
           chain: arcTestnet,
-          transport: custom(window.ethereum)
+          transport: custom(getProvider())
         });
 
         closeModal();
@@ -4704,7 +5080,7 @@ async function payoutMilestone(jobId, milestoneIndex) {
     const walletClient = createWalletClient({
       account: userAddress.value,
       chain: arcTestnet,
-      transport: custom(window.ethereum)
+      transport: custom(getProvider())
     });
     
     const tx = await walletClient.writeContract({
@@ -4809,7 +5185,7 @@ async function raiseDispute(jobId) {
         const walletClient = createWalletClient({
           account: userAddress.value,
           chain: arcTestnet,
-          transport: custom(window.ethereum)
+          transport: custom(getProvider())
         });
 
         const tx = await walletClient.writeContract({
@@ -4891,7 +5267,7 @@ async function registerJuror() {
     const walletClient = createWalletClient({
       account: userAddress.value,
       chain: arcTestnet,
-      transport: custom(window.ethereum)
+      transport: custom(getProvider())
     });
 
     const tx = await walletClient.writeContract({
@@ -4972,7 +5348,7 @@ async function voteDispute(jobId, option) {
       const walletClient = createWalletClient({
         account: userAddress.value,
         chain: arcTestnet,
-        transport: custom(window.ethereum)
+        transport: custom(getProvider())
       });
 
       if (allowance < BigInt(requiredAllowance)) {
@@ -5042,7 +5418,7 @@ async function resolveDispute(jobId) {
       const walletClient = createWalletClient({
         account: userAddress.value,
         chain: arcTestnet,
-        transport: custom(window.ethereum)
+        transport: custom(getProvider())
       });
 
       const tx = await walletClient.writeContract({
@@ -5130,7 +5506,7 @@ async function appealDispute(jobId) {
       const walletClient = createWalletClient({
         account: userAddress.value,
         chain: arcTestnet,
-        transport: custom(window.ethereum)
+        transport: custom(getProvider())
       });
 
       if (allowance < BigInt(appealFee)) {
@@ -5195,7 +5571,7 @@ async function executeRuling(jobId) {
       const walletClient = createWalletClient({
         account: userAddress.value,
         chain: arcTestnet,
-        transport: custom(window.ethereum)
+        transport: custom(getProvider())
       });
       const tx = await walletClient.writeContract({
         address: systemStatus.value.contractAddress,
@@ -5248,7 +5624,7 @@ async function resolveFinalAppeal(jobId, ruling) {
       const walletClient = createWalletClient({
         account: userAddress.value,
         chain: arcTestnet,
-        transport: custom(window.ethereum)
+        transport: custom(getProvider())
       });
       const tx = await walletClient.writeContract({
         address: systemStatus.value.contractAddress,
@@ -5350,20 +5726,78 @@ async function simulatePrMerge(jobId) {
 // --- CIRCLE APP KIT DEMOS ---
 
 async function executeAppKitSwap() {
-  if (!window.ethereum) {
-    modals.warning('EVM Extension Missing', 'Please install MetaMask or another EVM wallet extension first to interact with Circle App-Kit.');
+  if (!circleUserWallet.value && !getProvider()) {
+    modals.warning('Wallet Provider Missing', 'Please connect a wallet first to interact with Circle App-Kit.');
     return;
   }
   isSubmitting.value = true;
   modals.loading('Initiating Swap', `Swapping ${swapForm.value.amountIn} USDC to EURC via Circle App Kit...`);
   try {
     console.log(`Executing App Kit Swap: ${swapForm.value.amountIn} USDC -> EURC`);
+    
+    if (circleUserWallet.value) {
+      const usdcUnits = parseUnits(swapForm.value.amountIn.toString(), 6);
+      
+      // Step 1: Approve
+      console.log(`[Circle UCW Swap] Step 1/2: Approving USDC spend of ${usdcUnits.toString()} for router...`);
+      modals.loading('Initiating Swap', `Step 1/2: Approving USDC spending... (PIN challenge required)`);
+      
+      const approveRes = await executeSponsoredTransaction({
+        walletId: circleUserWallet.value.id,
+        contractAddress: USDC_TOKEN_ADDRESS,
+        abiFunctionSignature: 'approve(address,uint256)',
+        abiParameters: [STABLE_FX_ROUTER_ADDRESS, usdcUnits.toString()],
+        userToken: circleSessionToken.value,
+        userAddress: userAddress.value,
+        isSimulation: isSimulationMode.value,
+        executeChallengeFn: executeChallenge
+      });
+      
+      console.log('[Circle UCW Swap] Step 1/2 Approve result:', approveRes);
+      
+      if (!approveRes.success) {
+        throw new Error('Approval transaction failed');
+      }
+
+      // Dismiss Step 1 loading modal before proceeding to Step 2
+      closeModal();
+
+      // Short delay to ensure nonce updates
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Step 2: Swap
+      console.log(`[Circle UCW Swap] Step 2/2: Executing swap swap(tokenIn, tokenOut, amountIn, minAmountOut, recipient)...`);
+      modals.loading('Executing Swap', `Step 2/2: Exchanging USDC to EURC... (PIN challenge required)`);
+      
+      const swapRes = await executeSponsoredTransaction({
+        walletId: circleUserWallet.value.id,
+        contractAddress: STABLE_FX_ROUTER_ADDRESS,
+        abiFunctionSignature: 'swap(address,address,uint256,uint256,address)',
+        abiParameters: [USDC_TOKEN_ADDRESS, EURC_TOKEN_ADDRESS, usdcUnits.toString(), '0', userAddress.value],
+        userToken: circleSessionToken.value,
+        userAddress: userAddress.value,
+        isSimulation: isSimulationMode.value,
+        executeChallengeFn: executeChallenge
+      });
+      
+      console.log('[Circle UCW Swap] Step 2/2 Swap result:', swapRes);
+      
+      if (!swapRes.success) {
+        throw new Error('Swap transaction execution failed');
+      }
+
+      closeModal();
+      modals.success('Swap Completed!', `Circle User-Controlled Wallet swap executed successfully!\nTx Hash: ${swapRes.txHash || 'Success'}`);
+      await fetchUserBlockchainDetails();
+      return;
+    }
+
     // Dynamic import to avoid SSR errors
     const { AppKit } = await import('@circle-fin/app-kit');
     const { createViemAdapterFromProvider } = await import('@circle-fin/adapter-viem-v2');
     
     const adapter = await createViemAdapterFromProvider({
-      provider: window.ethereum,
+      provider: getProvider(),
     });
     
     const kit = new AppKit();
@@ -5393,20 +5827,40 @@ async function executeAppKitSwap() {
 }
 
 async function executeAppKitSend() {
-  if (!window.ethereum) {
-    modals.warning('EVM Extension Missing', 'Please install MetaMask or another EVM wallet extension first to interact with Circle App-Kit.');
+  if (!circleUserWallet.value && !getProvider()) {
+    modals.warning('Wallet Provider Missing', 'Please connect a wallet first to interact with Circle App-Kit.');
     return;
   }
   isSubmitting.value = true;
   modals.loading('Initiating Stablecoin Send', `Sending ${sendForm.value.amount} USDC to ${sendForm.value.recipient} using Circle App Kit...`);
   try {
     console.log(`Executing App Kit Send: ${sendForm.value.amount} USDC to ${sendForm.value.recipient}`);
+    
+    if (circleUserWallet.value) {
+      const usdcUnits = parseUnits(sendForm.value.amount.toString(), 6);
+      const result = await executeSponsoredTransaction({
+        walletId: circleUserWallet.value.id,
+        contractAddress: USDC_TOKEN_ADDRESS,
+        abiFunctionSignature: 'transfer(address,uint256)',
+        abiParameters: [sendForm.value.recipient, usdcUnits.toString()],
+        userToken: circleSessionToken.value,
+        userAddress: userAddress.value,
+        isSimulation: isSimulationMode.value,
+        executeChallengeFn: executeChallenge
+      });
+      console.log('Circle UCW gasless transfer result:', result);
+      closeModal();
+      modals.success('Transfer Successful!', `Circle User-Controlled Wallet stablecoin send completed successfully!\nTx Hash: ${result.txHash || 'Success'}`);
+      await fetchUserBlockchainDetails();
+      return;
+    }
+
     // Dynamic import to avoid SSR errors
     const { AppKit } = await import('@circle-fin/app-kit');
     const { createViemAdapterFromProvider } = await import('@circle-fin/adapter-viem-v2');
     
     const adapter = await createViemAdapterFromProvider({
-      provider: window.ethereum,
+      provider: getProvider(),
     });
     
     const kit = new AppKit();
