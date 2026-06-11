@@ -32,7 +32,7 @@ async function test() {
     ],
     [
       150000000n, // 150 USDC
-      'https://github.com/chaayadev1995/gig-market-test-99'
+      'https://github.com/chaayadev1995/gig-market'
     ]
   );
 

@@ -46,7 +46,7 @@ async function verifyCircleSignature(rawBody, signatureBase64, keyId) {
   const bypassVerification =
     process.env.NODE_ENV === 'test' ||
     !process.env.CIRCLE_API_KEY ||
-    process.env.CIRCLE_API_KEY.startsWith('TEST_API_KEY') ||
+    process.env.CIRCLE_API_KEY.startsWith('TEST_API_KEY_PLACEHOLDER') ||
     process.env.BYPASS_WEBHOOK_VERIFICATION === 'true';
 
   if (bypassVerification) {
@@ -58,8 +58,8 @@ async function verifyCircleSignature(rawBody, signatureBase64, keyId) {
     let pemPublicKey = publicKeyCache[keyId];
     if (!pemPublicKey) {
       const apiKey = process.env.CIRCLE_API_KEY;
-      const isSandbox = apiKey.startsWith('SANDBOX') || apiKey.includes('test') || apiKey.includes('sandbox');
-      const baseUrl = isSandbox ? 'https://api-sandbox.circle.com' : 'https://api.circle.com';
+      // Note: Web3 Services (w3s) and notification endpoints always use api.circle.com for both sandbox and mainnet.
+      const baseUrl = 'https://api.circle.com';
 
       console.log(`[SCP Webhook] Fetching public key for ID: ${keyId} from ${baseUrl}...`);
       const response = await $fetch(`${baseUrl}/v2/notifications/publicKey/${keyId}`, {
