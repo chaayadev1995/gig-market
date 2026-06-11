@@ -162,63 +162,63 @@ Open `http://localhost:3000` in your web browser.
 
 You can verify all core protocol workflows using the embedded frontend or terminal-based verification scripts:
 
-### Luồng 1: Hộp thoại Nhập PIN & Bỏ qua mô phỏng (Simulation Bypass Mode)
-1. Mở menu **Connect Wallet** trên thanh tiêu đề -> Chọn **Circle (Web2 Social)**.
-2. Nhập Email của bạn. Để tránh bị giới hạn tần suất API (429 Rate Limits) hoặc bỏ qua việc đăng ký mã PIN trên Sandbox, tích chọn hộp kiểm:
+### Flow 1: PIN Prompt & Simulation Bypass Mode
+1. Open the **Connect Wallet** menu in the navbar -> Choose **Circle (Web2 Social)**.
+2. Enter your email address. To avoid API rate limit bottlenecks (429 Rate Limits) or skip PIN setups in the Sandbox, check the box:
    * **`[x] Enable Simulation Mode (Bypass PIN/OTP)`**
-3. Nhấp **Sign In**. Bạn sẽ được kết nối tức thì bằng địa chỉ ví thử nghiệm mô phỏng trên Arc Testnet.
+3. Click **Sign In**. You will be instantly connected with a simulated test wallet address on Arc Testnet.
 
-### Luồng 2: Ký quỹ Nhân sự & Sweep USYC (SME Escrow & Sweeping)
-1. Đăng nhập với tư cách **Client** -> Vào mục **Client Portal**.
-2. Nhấp **Post New Job**, điền thông số và ngân sách (ví dụ: 10 USDC). Chọn thanh toán dạng **Public Job**.
-3. Nền tảng sẽ kích hoạt 2 giao dịch ký gửi sponsored gasless:
-   * Duyệt chi (`approve`) USDC ngân sách cho hợp đồng `GigMarketEscrow`.
-   * Tạo công việc (`createJob`) khóa quỹ.
-4. Quỹ ký quỹ sẽ tự động được sweep sang `MockUSYC`.
-5. Đăng nhập tài khoản khác làm **Freelancer** -> Chọn công việc -> Click **Join**. 
-6. Client phê duyệt Milestone -> Quỹ được rút từ USYC, trả lương gốc cho Freelancer, và trả lãi suất USYC tích lũy lại cho Client.
+### Flow 2: Human Escrow & Sweep USYC (SME Escrow & Sweeping)
+1. Sign in as **Client** -> Go to **Client Portal**.
+2. Click **Post New Job**, fill in details and budget (e.g. 10 USDC). Choose payout type **Public Job**.
+3. The platform will trigger 2 sponsored gasless transactions:
+   * `approve` USDC budget allowance to the `GigMarketEscrow` contract.
+   * `createJob` to lock the budget.
+4. The escrowed funds will be automatically swept into `MockUSYC`.
+5. Sign in with another account as **Freelancer** -> Select the job -> Click **Join**. 
+6. Client approves the Milestone -> Escrowed funds are redeemed from USYC, the principal budget is settled to the Freelancer, and the accumulated USYC interest yield is refunded back to the Client's wallet.
 
-### Luồng 3: Quy đổi tiền tệ StableFX (USDC ↔ EURC)
-1. Đăng nhập làm **Freelancer**, vào phần thiết lập ví và đổi cấu hình nhận thanh toán sang **EURC**.
-2. Khi Client bấm giải ngân, hệ thống tự động gọi API StableFX lấy báo giá, thực thi `approveMilestoneWithSlippage` để hoán đổi USDC sang EURC và gửi thẳng EURC cho Freelancer.
+### Flow 3: StableFX Currency Swap (USDC ↔ EURC)
+1. Sign in as **Freelancer**, go to wallet settings, and change your preferred payout currency to **EURC**.
+2. When the Client triggers a milestone payout, the system automatically fetches a live FX rate quote from the Circle StableFX API and executes `approveMilestoneWithSlippage` to swap USDC into EURC and send the EURC directly to the Freelancer.
 
-### Luồng 4: Quy trình Đại lý AI (ERC-8183 AI Escrow)
-1. Vào tab **Agent Economy** trên trang chủ.
-2. Thực hiện đăng ký AI Agent mới, nạp tiền vào nhiệm vụ và chạy toàn bộ quy trình: **AI Agent Staking -> Execute task -> Oracle attestation -> Payout**.
+### Flow 4: Autonomous AI Agent Escrow (ERC-8183 AI Escrow)
+1. Go to the **Agent Economy** tab on the homepage.
+2. Complete the registration for a new AI Agent, fund a task, and run the entire lifecycle: **AI Agent Staking -> Execute task -> Oracle attestation -> Payout**.
 
-### Luồng 5: Chạy các Script kiểm thử tự động (Không cần UI)
-Bạn có thể chạy các kịch bản kiểm thử toàn diện thông qua terminal:
-* **Kiểm thử Webhook & Payout tự động**:
+### Flow 5: Run Automated Verification Scripts (Terminal)
+You can run comprehensive test suites directly via the terminal:
+* **Automated Webhook & Payout Testing**:
   ```bash
   node scripts/verify_scp_webhook.js
   ```
-* **Kiểm thử Tỷ giá StableFX**:
+* **StableFX Exchange Rate Quote Testing**:
   ```bash
   node scripts/test_stablefx.js
   ```
 
 ---
 
-## 📝 Circle Product Feedback (Tài liệu phản hồi sản phẩm)
+## 📝 Circle Product Feedback
 
-Bài học kinh nghiệm và phản hồi thực tế từ quá trình tích hợp trên Arc:
+Key learnings and practical feedback from our development experience on Arc:
 
-### A. Tại sao chúng tôi chọn các sản phẩm này:
-Một thị trường lao động Freelance bao gồm rất nhiều người dùng không chuyên về Web3. Việc yêu cầu họ nắm giữ các mã thông báo gas dễ biến động (như ETH, MATIC) là một rào cản quá lớn. Circle Embedded Wallets phối hợp với Gas Station trên Arc đã biến trải nghiệm Web3 thành một ứng dụng Web2 mượt mà. Lợi thế dùng USDC làm phí giao dịch gốc trên Arc và khả năng sweep sinh lãi qua USYC là giải pháp tài chính đầy tiềm năng cho các doanh nghiệp vừa và nhỏ (SME).
+### A. Why we chose these products:
+Freelance marketplaces involve many users who are not crypto-native. Requiring them to hold volatile gas tokens (such as ETH or MATIC) introduces massive friction. Circle Embedded Wallets paired with the Gas Station paymaster on Arc transform the Web3 user experience into a seamless Web2 feel. Furthermore, the ability to settle gas fees natively in USDC and sweep locked collateral into interest-bearing USYC vaults presents a major financial incentive for SMEs.
 
-### B. Những điểm hoạt động tốt:
-- Mạng Arc Testnet có tốc độ xác thực khối cực nhanh (dưới 1 giây).
-- Việc gọi API và SDK ví của Circle hoạt động rất ổn định khi đường truyền mạng thông suốt.
-- Dễ dàng tích hợp với các thư viện Web3 tiêu chuẩn như Viem.
+### B. What worked well:
+- Arc Testnet achieves sub-second block finality.
+- Circle Wallet SDK APIs are extremely reliable and fast under stable network conditions.
+- Seamless integration with standard Web3 client tools like Viem.
 
-### C. Những điểm cần cải thiện & Đề xuất kiến nghị:
+### C. Gaps & Recommendations:
 
-#### 1. Tối ưu hóa xử lý khi xảy ra Rate Limit (429) ở Iframe PIN/OTP:
-* **Vấn đề**: Khi người dùng thực hiện nhiều giao dịch liên tục trên môi trường Sandbox, hệ thống bảo mật PIN Dialog của Circle Web SDK dễ bị lỗi 429 (Too Many Requests) và không kích hoạt callback báo lỗi về ứng dụng chính, khiến giao diện quay vô hạn (stuck spinner).
-* **Giải pháp chúng tôi đã làm**: Bổ sung cấu trúc thời gian chờ (Safety Timeout 90s) phía client để hủy màn hình chờ và báo lỗi cụ thể cho người dùng, đồng thời thiết lập tùy chọn "Simulation Mode" để nhà phát triển bypass PIN khi debug.
-* **Kiến nghị**: SDK của Circle nên tự động ném ra mã lỗi cụ thể về cho ứng dụng gọi khi Iframe PIN/OTP bị nghẽn mạng hoặc quá tải, thay vì im lặng không gọi callback.
+#### 1. Handle Rate Limits (429) inside PIN/OTP Iframes gracefully:
+* **Issue**: When executing multiple sequential transactions in the Sandbox environment, Circle's PIN entry dialog can return a 429 Too Many Requests error. The SDK fails to propagate this event back to the hosting application, leaving the user interface stuck in a loading state.
+* **Workaround implemented**: We added a safety client-side timer (90s timeout) to close the spinner dialog and alert the user, alongside a "Simulation Mode" switch to bypass PIN requirements for local development.
+* **Recommendation**: Circle's web SDK should trigger error callbacks with specific code exceptions if the underlying PIN/OTP iframe encounters API blocks or rate limits, rather than failing silently.
 
-#### 2. Trình theo dõi giao dịch (Transaction Tracing) cho Developer Console:
-* **Vấn đề**: Khi các giao dịch qua ví Developer-Controlled bị lỗi (ví dụ revert do AccessControl thiếu role), thông tin trả về từ API khá mơ hồ, gây khó khăn cho việc gỡ lỗi.
-* **Giải pháp chúng tôi đã làm**: Viết script Node.js kiểm tra role on-chain trước khi gửi.
-* **Kiến nghị**: Tích hợp bảng log chi tiết lý do revert (ví dụ: custom error name, require reason) ngay trên Dashboard điều khiển của Circle Developer Console cho mạng Arc.
+#### 2. Better Revert Tracing in Developer Console:
+* **Issue**: When transactions executed via Developer-Controlled Wallets fail (such as on-chain reverts from OpenZeppelin role checks), the API logs return opaque transaction failures.
+* **Workaround implemented**: We wrote pre-flight validation checks to verify roles on-chain before initiating transactions.
+* **Recommendation**: Add a transaction tracing tab or debug logs inside the Circle Developer Console dashboard, displaying clear contract revert reason strings (e.g., missing role names) on Arc Testnet transactions.
