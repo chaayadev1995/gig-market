@@ -3424,6 +3424,10 @@ async function handleCircleLogin() {
         response.isSimulation
       );
       userAddress.value = wallet.address;
+      
+      // Initialize the SDK client for transaction signing
+      await initCircleSdk(response.appId, response.userToken, response.encryptionKey);
+
       closeWalletModal();
       fetchUserBlockchainDetails().catch(e => console.warn('Background check failed:', e));
       modals.success('Welcome Back!', `Successfully authenticated. Wallet: ${shortAddress(wallet.address)}`);
