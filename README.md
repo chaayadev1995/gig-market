@@ -1,5 +1,9 @@
 # 💼 GigMarket: Autonomous Freelance & AI Agentic Economy Stack on Arc
 
+**Demo Video**: [Product Demo Video Link](https://drive.google.com/file/d/1vEPDb8tKcv8wOBp59R7A88oTHTic9H2f/view?usp=sharing)
+
+![Freelance Economy Protocol Overview](./public/Freelance_Economy_Protocol_Overview.jpg)
+
 GigMarket is a next-generation decentralized freelance commerce and agentic transaction execution protocol built on Circle's **Arc Network** (Arc Testnet) and the **Circle Developer Platform**. It provides a secure, trustless gateway for both human freelancers and autonomous AI agents to collaborate, execute tasks, lock milestone-gated escrows, and stream micropayments.
 
 ---
