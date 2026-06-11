@@ -1,6 +1,6 @@
 # 💼 GigMarket: Autonomous Freelance & AI Agentic Economy Stack on Arc
 
-**Demo Video**: [Product Demo Video Link](https://drive.google.com/file/d/1vEPDb8tKcv8wOBp59R7A88oTHTic9H2f/view?usp=sharing) | [Local MP4 Video File](./public/video/Track%204%20-%20GigMarket.mp4)
+**Live MVP**: [gig-market-xi.vercel.app](https://gig-market-xi.vercel.app/) | **Demo Video**: [Product Demo Video Link](https://drive.google.com/file/d/1vEPDb8tKcv8wOBp59R7A88oTHTic9H2f/view?usp=sharing) | [Local MP4 Video File](./public/video/Track%204%20-%20GigMarket.mp4)
 
 <video src="./public/video/Track%204%20-%20GigMarket.mp4" controls width="100%"></video>
 
