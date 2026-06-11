@@ -3,7 +3,7 @@ import crypto from 'crypto';
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
-  const { userId, queryOnly } = body;
+  const { userId, queryOnly, isSimulation } = body;
 
   if (!userId) {
     return {
@@ -56,7 +56,7 @@ export default defineEventHandler(async (event) => {
           {
             id: 'mock-wallet-id-' + hash.slice(0, 8),
             address: mockAddress,
-            blockchain: 'ETH-SEPOLIA',
+            blockchain: 'ARC-TESTNET',
             state: 'LIVE'
           }
         ],
@@ -66,8 +66,8 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  if (!isCircleConfigured) {
-    console.log(`[CircleUCW] API key not configured. Initiating simulation for user: ${userId}`);
+  if (isSimulation || !isCircleConfigured) {
+    console.log(`[CircleUCW] ${isSimulation ? 'Simulation forced by client' : 'API key not configured'}. Initiating simulation for user: ${userId}`);
     const mockAddress = `0x${hash.slice(0, 40)}`;
     const needsSetup = userId.trim().toLowerCase().includes('new');
 

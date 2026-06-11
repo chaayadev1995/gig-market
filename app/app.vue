@@ -1926,6 +1926,17 @@
                       :disabled="isConnectingWallet"
                       @keydown.enter="handleCircleLogin"
                     />
+                    
+                    <!-- Simulation Mode Toggle Checkbox -->
+                    <label style="display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 12px; font-weight: 700; color: var(--text-secondary); cursor: pointer; user-select: none; margin-bottom: 4px;">
+                      <input 
+                        type="checkbox" 
+                        v-model="isSimulationMode" 
+                        style="width: 16px; height: 16px; accent-color: var(--accent-magenta); cursor: pointer;"
+                      />
+                      <span>Enable Simulation Mode (Bypass PIN/OTP)</span>
+                    </label>
+
                     <button class="btn btn-primary" style="width: 100%;" @click="handleCircleLogin" :disabled="isConnectingWallet">
                       {{ isConnectingWallet ? 'Authenticating...' : 'Sign In with Email' }}
                     </button>
@@ -3400,7 +3411,10 @@ async function handleCircleLogin() {
     console.log('[CircleUCW] Authenticating user:', circleEmail.value);
     const response = await $fetch('/api/circle-wallet-session', {
       method: 'POST',
-      body: { userId: circleEmail.value }
+      body: { 
+        userId: circleEmail.value,
+        isSimulation: isSimulationMode.value
+      }
     });
 
     if (!response.success) {
