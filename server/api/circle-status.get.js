@@ -57,8 +57,13 @@ export default defineEventHandler(async (event) => {
       }
     }
   } else {
-    // Circle mode: we can list wallets to get the address or use the configured wallet
-    walletAddress = status.circleWalletId || 'Circle Wallet ID Not Found';
+    // Circle mode: try to use the configured wallet address from env, or list/get wallet to resolve it
+    if (process.env.CIRCLE_WALLET_ADDRESS && /^0x[a-fA-F0-9]{40}$/.test(process.env.CIRCLE_WALLET_ADDRESS)) {
+      walletAddress = process.env.CIRCLE_WALLET_ADDRESS;
+    } else {
+      walletAddress = status.circleWalletId || 'Circle Wallet ID Not Found';
+    }
+
     // For simplicity, we can fetch balance via Circle client
     try {
       const { CircleDeveloperControlledWalletsClient } = await import('@circle-fin/developer-controlled-wallets');
@@ -67,16 +72,26 @@ export default defineEventHandler(async (event) => {
         entitySecret: process.env.CIRCLE_ENTITY_SECRET,
       });
 
-      const walletInfo = await client.getWallet({ id: status.circleWalletId });
-      walletAddress = walletInfo.wallet?.address || walletAddress;
+      // Only fetch wallet details from Circle API if the address is not already resolved/valid
+      if (!/^0x[a-fA-F0-9]{40}$/.test(walletAddress) && status.circleWalletId) {
+        const walletInfo = await client.getWallet({ id: status.circleWalletId });
+        walletAddress = walletInfo.wallet?.address || walletAddress;
+      }
 
-      const balances = await client.getWalletTokenBalance({ id: status.circleWalletId });
-      const usdcToken = balances.tokenBalances?.find(b => b.token?.symbol === 'USDC');
-      usdcBalance = usdcToken?.amount || '0.00';
-      nativeBalance = usdcBalance; // Native gas is USDC on Arc
+      if (status.circleWalletId && status.circleWalletId !== 'your-circle-wallet-id-here') {
+        const balances = await client.getWalletTokenBalance({ id: status.circleWalletId });
+        const usdcToken = balances.tokenBalances?.find(b => b.token?.symbol === 'USDC');
+        usdcBalance = usdcToken?.amount || '0.00';
+        nativeBalance = usdcBalance; // Native gas is USDC on Arc
+      }
     } catch (e) {
       console.error('Error fetching Circle balance:', e);
     }
+  }
+
+  // Ensure walletAddress is a valid EVM address format to prevent viem validation crashes
+  if (!/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+    walletAddress = '0x0000000000000000000000000000000000000000';
   }
 
   const query = getQuery(event);

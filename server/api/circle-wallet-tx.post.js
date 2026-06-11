@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
 
   const isCircleConfigured = 
     process.env.CIRCLE_API_KEY && 
-    !process.env.CIRCLE_API_KEY.startsWith('TEST_API_KEY') &&
+    !process.env.CIRCLE_API_KEY.startsWith('TEST_API_KEY_PLACEHOLDER') &&
     process.env.CIRCLE_API_KEY !== 'your-circle-api-key-here';
 
   if (!isCircleConfigured) {
@@ -36,10 +36,13 @@ export default defineEventHandler(async (event) => {
 
   const API_KEY = process.env.CIRCLE_API_KEY;
 
+  // Note: Web3 Services (w3s) endpoints always use api.circle.com for both sandbox and mainnet.
+  const baseUrl = 'https://api.circle.com';
+
   try {
     console.log(`[CircleUCW-Tx] Creating contract execution transaction challenge for wallet ${walletId}`);
     
-    const response = await fetch('https://api.circle.com/v1/w3s/user/transactions/contractExecution', {
+    const response = await fetch(`${baseUrl}/v1/w3s/user/transactions/contractExecution`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${API_KEY}`,

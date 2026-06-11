@@ -7,8 +7,10 @@ export const circleEncryptionKey = ref(null);
 export const circleAppId = ref(null);
 export const circleUserId = ref(null);
 export const isSimulationMode = ref(false);
+export const activeWalletProvider = ref(null);
 
-let sdkInstance = null;
+// Store on globalThis to ensure session survival across HMR and multiple module imports
+let sdkInstance = typeof globalThis !== 'undefined' ? (globalThis.__circleSdkInstance || null) : null;
 
 /**
  * Initialize Circle Web SDK client-side
@@ -29,10 +31,19 @@ export async function initCircleSdk(appId, userToken, encryptionKey) {
       }
     });
 
+    if (typeof globalThis !== 'undefined') {
+      globalThis.__circleSdkInstance = sdkInstance;
+    }
+
     sdkInstance.setAuthentication({
       userToken: userToken,
       encryptionKey: encryptionKey
     });
+
+    // Establish session with Circle authentication service
+    console.log('[CircleSDK] Requesting device ID...');
+    const deviceId = await sdkInstance.getDeviceId();
+    console.log('[CircleSDK] Device ID obtained:', deviceId);
 
     console.log('[CircleSDK] SDK Initialized successfully');
     return true;
@@ -62,11 +73,12 @@ export function executeChallenge(challengeId) {
   }
 
   return new Promise((resolve, reject) => {
-    if (!sdkInstance) {
-      return reject(new Error('Circle Web SDK is not initialized. Call initCircleSdk first.'));
+    const activeInstance = sdkInstance || (typeof globalThis !== 'undefined' ? globalThis.__circleSdkInstance : null);
+    if (!activeInstance) {
+      return reject(new Error('Your Circle wallet session has expired or is not initialized. Please click the Disconnect button and log in again to renew your session (session tokens are valid for 60 minutes).'));
     }
 
-    sdkInstance.execute(challengeId, (error, result) => {
+    activeInstance.execute(challengeId, (error, result) => {
       if (error) {
         console.error('[CircleSDK] Challenge execution failed:', error);
         return reject(error);
@@ -100,7 +112,8 @@ export function checkPersistedWallet() {
     
     // Attempt sdk re-initialization
     initCircleSdk(savedAppId, savedToken, savedKey).catch(err => {
-      console.error('Failed to re-initialize Circle SDK:', err);
+      console.error('Failed to re-initialize Circle SDK, clearing persisted state:', err);
+      clearWalletState();
     });
   }
 }

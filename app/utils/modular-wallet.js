@@ -73,7 +73,31 @@ export async function executeSponsoredTransaction({
 
   console.log(`[ModularWallet] Challenge generated. Challenge ID: ${response.challengeId}`);
   const challengeResult = await executeChallengeFn(response.challengeId);
-  const txHash = challengeResult?.data?.txHash || 'Pending';
+  
+  let txHash = 'Pending';
+  console.log(`[ModularWallet] Challenge execution completed. Polling latest transactions for wallet: ${walletId}`);
+  
+  // Poll every 1.5 seconds for up to 30 times (45 seconds max) to resolve the transaction hash
+  for (let i = 0; i < 30; i++) {
+    try {
+      const resolveRes = await $fetch('/api/circle-resolve-tx', {
+        method: 'POST',
+        body: { userToken, walletId }
+      });
+      if (resolveRes.success && resolveRes.transaction?.txHash) {
+        txHash = resolveRes.transaction.txHash;
+        console.log(`[ModularWallet] Successfully resolved txHash from transactions list: ${txHash}`);
+        break;
+      }
+    } catch (err) {
+      console.warn('[ModularWallet] Error resolving latest transaction:', err.message || err);
+    }
+    await new Promise(resolve => setTimeout(resolve, 1500));
+  }
+
+  if (txHash === 'Pending') {
+    txHash = challengeResult?.data?.txHash || 'Pending';
+  }
 
   incrementSponsoredMetrics(response.estimatedGasSaved || '0.0050');
 

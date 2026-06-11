@@ -61,7 +61,7 @@ export function getAgentEscrow8183Address() {
 export function getCircleConfigStatus() {
   const isCircleConfigured = 
     process.env.CIRCLE_API_KEY && 
-    !process.env.CIRCLE_API_KEY.startsWith('TEST_API_KEY') &&
+    !process.env.CIRCLE_API_KEY.startsWith('TEST_API_KEY_PLACEHOLDER') &&
     process.env.CIRCLE_WALLET_ID && 
     process.env.CIRCLE_WALLET_ID !== 'your-circle-wallet-id-here';
 
@@ -241,8 +241,8 @@ export async function executeEscrowApproval(jobId, milestoneIndex) {
       let quoteRate = 0.92;
       try {
         const apiKey = process.env.CIRCLE_API_KEY;
-        if (apiKey && !apiKey.startsWith('TEST_API_KEY')) {
-          const isSandbox = apiKey.startsWith('SANDBOX') || apiKey.includes('test') || apiKey.includes('sandbox');
+        if (apiKey && !apiKey.startsWith('TEST_API_KEY_PLACEHOLDER')) {
+          const isSandbox = apiKey.startsWith('SANDBOX') || apiKey.includes('test') || apiKey.includes('sandbox') || apiKey.startsWith('TEST_API_KEY');
           const baseUrl = isSandbox ? 'https://api-sandbox.circle.com' : 'https://api.circle.com';
           const response = await $fetch(`${baseUrl}/v1/exchange/stablefx/quotes`, {
             method: 'POST',
