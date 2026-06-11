@@ -1,3 +1,3 @@
-import * as dcw from '@circle-fin/developer-controlled-wallets';
-console.log("Exports from @circle-fin/developer-controlled-wallets:");
-console.log(Object.keys(dcw));
+import { Blockchain } from '@circle-fin/developer-controlled-wallets';
+console.log("Supported Blockchain values in SDK:");
+console.log(Blockchain);

@@ -118,7 +118,7 @@ export default defineEventHandler(async (event) => {
                   });
                 }
               } catch (privacyError) {
-                console.error('Error fetching privacy fields:', privacyError);
+                console.warn(`[Jobs API] Privacy check failed for Job #${job.id}:`, privacyError.shortMessage || privacyError.message);
               }
 
               const statusMap = ['Created', 'Active', 'Disputed', 'Resolved', 'Completed', 'AppealPending'];

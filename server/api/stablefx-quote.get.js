@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
   const amount = query.amount || '1.00';
   const apiKey = process.env.CIRCLE_API_KEY;
 
-  if (!apiKey || apiKey.startsWith('TEST_API_KEY')) {
+  if (!apiKey || apiKey.startsWith('TEST_API_KEY_PLACEHOLDER')) {
     // Return mock quote
     return {
       success: true,
@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const isSandbox = apiKey.startsWith('SANDBOX') || apiKey.includes('test') || apiKey.includes('sandbox');
+    const isSandbox = apiKey.startsWith('SANDBOX') || apiKey.includes('test') || apiKey.includes('sandbox') || apiKey.startsWith('TEST_API_KEY');
     const baseUrl = isSandbox ? 'https://api-sandbox.circle.com' : 'https://api.circle.com';
     
     // Call Circle StableFX quotes API

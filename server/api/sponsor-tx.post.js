@@ -73,10 +73,13 @@ export default defineEventHandler(async (event) => {
   // In Circle's SCA architecture, gas station policy configured in the developer console
   // automatically handles the sponsorship of the transaction once it is initiated.
   const API_KEY = process.env.CIRCLE_API_KEY;
+  // Note: Web3 Services (w3s) endpoints always use api.circle.com for both sandbox and mainnet.
+  const baseUrl = 'https://api.circle.com';
+
   try {
     console.log(`[Sponsor-Tx] Dispatching contract execution challenge via Circle for user: ${userAddress}`);
     
-    const response = await fetch('https://api.circle.com/v1/w3s/user/transactions/contractExecution', {
+    const response = await fetch(`${baseUrl}/v1/w3s/user/transactions/contractExecution`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
@@ -102,6 +105,7 @@ export default defineEventHandler(async (event) => {
       success: true,
       sponsored: true,
       challengeId: data.data.challengeId,
+      txId: data.data.id,
       estimatedGasSaved: '0.0050',
       isSimulation: false
     };
