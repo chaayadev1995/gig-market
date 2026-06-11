@@ -24,14 +24,20 @@ export default defineEventHandler(async (event) => {
   const baseUrl = 'https://api.circle.com';
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
+
     const response = await fetch(`${baseUrl}/v1/w3s/transactions?pageSize=5`, {
       method: 'GET',
+      signal: controller.signal,
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'X-User-Token': userToken,
         'Content-Type': 'application/json'
       }
     });
+
+    clearTimeout(timeoutId);
 
     const data = await response.json();
     if (!response.ok) {

@@ -79,8 +79,12 @@ export default defineEventHandler(async (event) => {
   try {
     console.log(`[Sponsor-Tx] Dispatching contract execution challenge via Circle for user: ${userAddress}`);
     
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20-second timeout
+
     const response = await fetch(`${baseUrl}/v1/w3s/user/transactions/contractExecution`, {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'X-User-Token': body.userToken,
@@ -95,6 +99,8 @@ export default defineEventHandler(async (event) => {
         feeLevel: 'MEDIUM'
       })
     });
+
+    clearTimeout(timeoutId);
 
     const data = await response.json();
     if (!response.ok) {

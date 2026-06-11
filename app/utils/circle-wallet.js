@@ -78,7 +78,14 @@ export function executeChallenge(challengeId) {
       return reject(new Error('Your Circle wallet session has expired or is not initialized. Please click the Disconnect button and log in again to renew your session (session tokens are valid for 60 minutes).'));
     }
 
+    // Set a safety timeout of 90 seconds. If Circle secure iframe doesn't respond or callback within this period,
+    // we reject the promise to prevent endless spinning/freezing UI.
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Circle verification window timed out. Please check your network or try again.'));
+    }, 90000);
+
     activeInstance.execute(challengeId, (error, result) => {
+      clearTimeout(timeoutId);
       if (error) {
         console.error('[CircleSDK] Challenge execution failed:', error);
         return reject(error);

@@ -1931,7 +1931,7 @@
                     <label style="display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 12px; font-weight: 700; color: var(--text-secondary); cursor: pointer; user-select: none; margin-bottom: 4px;">
                       <input 
                         type="checkbox" 
-                        v-model="isSimulationMode" 
+                        v-model="localSimulationMode" 
                         style="width: 16px; height: 16px; accent-color: var(--accent-magenta); cursor: pointer;"
                       />
                       <span>Enable Simulation Mode (Bypass PIN/OTP)</span>
@@ -2448,6 +2448,13 @@ import {
 } from './utils/bridge-kit';
 
 const userAddress = ref('');
+
+const localSimulationMode = computed({
+  get: () => isSimulationMode.value,
+  set: (val) => {
+    isSimulationMode.value = val;
+  }
+});
 
 function getProvider() {
   return activeWalletProvider.value || (typeof window !== 'undefined' ? window.ethereum : null);
