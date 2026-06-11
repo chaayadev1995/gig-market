@@ -18,6 +18,22 @@ Traditional freelance marketplaces charge exorbitant platform fees (10-20%), suf
 
 ---
 
+## 📸 Project Screenshots & User Interface
+
+Here are the visual representations of the GigMarket platform interface showing the various portals and integration points:
+
+| Portal | Preview Screen |
+| :--- | :--- |
+| **Home Page** | ![Home Page Preview](./public/screens/home.png) |
+| **Client Portal** | ![Client Portal Preview](./public/screens/client%20portal.png) |
+| **Freelancer Portal** | ![Freelancer Portal Preview](./public/screens/freelancer%20portal.png) |
+| **Escrow Details** | ![Escrow Details Preview](./public/screens/escrow.png) |
+| **x402 Gateway** | ![x402 Gateway Preview](./public/screens/x402.png) |
+| **Jury Board** | ![Jury Board Preview](./public/screens/jury%20board.png) |
+| **App Kit Center** | ![App Kit Center Preview](./public/screens/app%20kit%20center.png) |
+
+---
+
 ## ⚙️ Core System Architecture
 
 The following diagram illustrates how the frontend client, Nuxt backend, Circle APIs, and Arc smart contracts interact:
