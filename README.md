@@ -42,31 +42,98 @@ Here are the visual representations of the GigMarket platform interface showing 
 
 ## ⚙️ Core System Architecture
 
-The following diagram illustrates how the frontend client, Nuxt backend, Circle APIs, and Arc smart contracts interact:
+The GigMarket platform features a multi-tiered architecture that spans the client application, backend API handlers, Circle's Web3 cloud infrastructure, and the smart contracts on the Arc L1 blockchain:
 
 ```mermaid
-graph TD
-    %% Clients
-    User[User Client: Client/Contractor] -- Web2 Login (Email/Social) --> UCW[Circle Embedded UCW]
-    User -- Bridge Base -> Arc --> Bridge[Bridge Kit / CCTP]
+%%{init: {"layout": "elk"}}%%
+graph TB
+    %% Class definitions for styling
+    classDef clientStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1;
+    classDef backendStyle fill:#efebe9,stroke:#4e342e,stroke-width:2px,color:#3e2723;
+    classDef circleStyle fill:#ede7f6,stroke:#4527a0,stroke-width:2px,color:#1a237e;
+    classDef contractStyle fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20;
+    classDef extStyle fill:#fff3e0,stroke:#ef6c00,stroke-width:2px,color:#e65100;
+
+    %% Client / UI Layer
+    subgraph UI_Layer ["Client & User Interface Layer"]
+        Client[Client Portal: Job Creator]:::clientStyle
+        Freelancer[Freelancer Portal: Contractor]:::clientStyle
+        AgentClient[AI Agent Client: Automated Bot]:::clientStyle
+        UCW_SDK[Circle Embedded UCW Web SDK<br/>@circle-fin/w3s-pw-web-sdk]:::clientStyle
+    end
+
+    %% API & Backend Middleware Layer
+    subgraph Backend_Layer ["API & Backend Middleware Layer (Nuxt Server Engine)"]
+        NuxtServer[Nuxt 4 API Routing & Middleware]:::backendStyle
+        API_Sponsor[/api/sponsor-tx - Gas Sponsorship/]:::backendStyle
+        API_Nanopay[/api/nanopay-settle - Micropayments Billing/]:::backendStyle
+        API_Webhook[/api/github-webhook & git-action - Git Trigger/]:::backendStyle
+        API_SCP_Webhook[/api/scp-webhook - Circle SCP Webhook/]:::backendStyle
+        API_Agent[/api/agents & agent-action - Agent Directory/]:::backendStyle
+        API_Yield[/api/treasury-sweep - Yield Sweep Management/]:::backendStyle
+        DB[(Database: PostgreSQL / JSON Local)]:::backendStyle
+    end
+
+    %% Circle Web3 Services Cloud
+    subgraph Circle_Web3 ["Circle Cloud & Web3 Utility Layer"]
+        UCW_API[User-Controlled Wallets API]:::circleStyle
+        DCW_API[Developer-Controlled Wallets API]:::circleStyle
+        GasStation[Gas Station Paymaster & Policy]:::circleStyle
+        StableFX_API[StableFX Conversion Rate API]:::circleStyle
+        SCP_Platform[Smart Contract Platform - SCP]:::circleStyle
+    end
+
+    %% Smart Contracts Layer on Arc L1
+    subgraph Blockchain_Layer ["Arc Testnet L1 Chain & Smart Contracts"]
+        USDC[USDC Token - NATIVE Gas & Settlement<br/>0x3600...0000]:::contractStyle
+        EURC[MockEURC Token<br/>0x5fbd...a49f]:::contractStyle
+        USYC[MockUSYC Vault - Yield-bearing Treasury<br/>0x74fe...320c]:::contractStyle
+        EscrowContract[GigMarketEscrow.sol<br/>Two-Way Escrow & Juror Pool<br/>0x04ed...d668]:::contractStyle
+        AgentEscrow[AgentEscrow8183.sol<br/>AI Agent Escrow - ERC-8183<br/>0xc744...e330]:::contractStyle
+        AgentRegistry[AgentRegistry.sol<br/>On-chain Agent Directory<br/>0xa37b...ba18]:::contractStyle
+        StableFXRouter[MockStableFXRouter.sol<br/>USDC/EURC Swap Router<br/>0xc5d9...f935]:::contractStyle
+        PrivacyModule[Arc Privacy Precompile & ZKP Modules<br/>0x0000...0180]:::contractStyle
+    end
+
+    %% External & Oracle Integrations
+    subgraph External_Integrations ["External Integrations & Partners"]
+        GithubRepo[Github Repository & PR Actions]:::extStyle
+        OracleEvaluator[Decentralized Oracle Evaluator / Attestor]:::extStyle
+        BridgeKit[Base Sepolia to Arc Bridge - CCTP & Bridge Kit]:::extStyle
+    end
+
+    %% Data & Execution Flows
+    Client -->|Web2 Login / OTP PIN| UCW_SDK
+    UCW_SDK <-->|Session Key Sync & Tx Signing| UCW_API
+    Client & Freelancer -->|UI Portal Operations| NuxtServer
+    AgentClient -->|API Requests over x402| API_Nanopay
     
-    %% Nuxt App Router
-    App[GigMarket Nuxt 3 Portal] -- 1. Sponsor Tx Request --> Backend[Nuxt Server Engine]
-    Backend -- 2. Relays Sponsored Tx --> GasStation[Circle Gas Station Paymaster]
-    GasStation -- 3. Broadcasts Gasless Tx --> Arc[Arc Testnet L1 Chain]
+    NuxtServer --> DB
+    NuxtServer -->|Gas Sponsorship Request| API_Sponsor
+    NuxtServer -->|Yield Sweeps & Claims| API_Yield
+    NuxtServer -->|Listen to Github Merges| API_Webhook
     
-    %% Contracts
-    Arc -.-> Escrow[GigMarketEscrow Contract]
-    Arc -.-> AgentEscrow[AgentEscrow8183 Contract]
+    API_Sponsor -->|Gas Sponsor Request| GasStation
+    API_Yield -->|Auto-sign via Developer Wallets| DCW_API
+    API_SCP_Webhook <-->|Validate & Parse Logs| SCP_Platform
     
-    %% Subsystem integrations
-    Escrow -- Sweep Idle Collateral --> USYC[Mock USYC Vault]
-    Escrow -- FX Conversion --> StableFX[StableFX Router]
+    GasStation -->|Gasless Broadcast| Blockchain_Layer
+    DCW_API -->|Auto-execute Tx / Rescue| Blockchain_Layer
+    SCP_Platform <-->|Listen & Index logs| Blockchain_Layer
     
-    %% AI & Micropayments
-    AgentEscrow -- Verify Work --> Oracle[Oracle Evaluator]
-    AgentEscrow -- Streaming Payment --> Gateway[Nanopayments Gateway]
-    ClientAgent[AI Agent Client] -- API Inferences --> Gateway
+    EscrowContract -->|Auto Sweep Idle Funds| USYC
+    EscrowContract -->|Swap USDC to EURC| StableFXRouter
+    StableFXRouter -->|Fetch FX Quotes| StableFX_API
+    StableFXRouter -->|Transfer converted asset| EURC
+    EscrowContract -->|Verify Registered Agent| AgentRegistry
+    EscrowContract <-->|Confidential escrow & ZKP| PrivacyModule
+    
+    AgentClient -->|Submit cryptographic deliverable hash| AgentEscrow
+    OracleEvaluator -->|Attest deliverables| AgentEscrow
+    
+    GithubRepo -->|Repository Webhook Event| API_Webhook
+    API_Webhook -->|Trigger Automated Payouts| DCW_API
+    BridgeKit -->|Cross-chain asset transfer| USDC
 ```
 
 ---
@@ -115,11 +182,11 @@ graph TD
 
 ## 🛠 Technology Stack
 
-*   **Smart Contracts**: Solidity `0.8.20` + Hardhat ESM
-*   **Web Framework**: Vue.js (Nuxt 3 SPA mode)
+*   **Smart Contracts**: Solidity `0.8.24` (Cancun EVM compatibility) + Hardhat ESM
+*   **Web Framework**: Vue.js (Nuxt 4 SPA mode)
 *   **Blockchain Integration**: `viem` + `@circle-fin/w3s-pw-web-sdk` (User-Controlled Wallets)
 *   **Backend Automation & SDKs**: Node.js + `@circle-fin/developer-controlled-wallets` + `@circle-fin/smart-contract-platform`
-*   **Data Indexing**: In-memory db storage (`db/jobs.json`, `db/users.json`) with automated backup.
+*   **Data Indexing & Database**: PostgreSQL/Supabase relational schema and flat-file local JSON backup (`db/jobs.json`, `db/users.json`).
 
 ---
 
